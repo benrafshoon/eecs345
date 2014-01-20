@@ -11,6 +11,7 @@ import (
     "time"
     "os"
     "bufio"
+    "strings"
 )
 
 import (
@@ -69,7 +70,15 @@ func main() {
         if err != nil {
                 // handle error
         }
-        log.Printf("input: %s", input) 
+        input = strings.Replace(input, "\n", "", -1) //use this as our end of input so remove it here
+        command := strings.Split(input," ")
+
+        switch command[0] {
+        case "whoami":
+            log.Printf("Your node ID is: %v", kadem.NodeID)
+        default:
+            log.Printf("Unrecognized command: %s", command[0])
+        }
     }
 }
 
