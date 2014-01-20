@@ -9,6 +9,8 @@ import (
     "net/http"
     "net/rpc"
     "time"
+    "os"
+    "bufio"
 )
 
 import (
@@ -60,5 +62,14 @@ func main() {
 
     log.Printf("ping msgID: %s\n", ping.MsgID.AsString())
     log.Printf("pong msgID: %s\n", pong.MsgID.AsString())
+
+    for {
+        in := bufio.NewReader(os.Stdin)
+        input, err := in.ReadString('\n')
+        if err != nil {
+                // handle error
+        }
+        log.Printf("input: %s", input) 
+    }
 }
 
