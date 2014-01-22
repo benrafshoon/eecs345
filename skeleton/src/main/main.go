@@ -67,15 +67,20 @@ func main() {
     //Testing for the basic queue of a bucket
     log.Printf(" *** TESTING BUCKET METHODS *** \n")
     bucket := kademlia.NewBucket()
-    testContact := kademlia.NewContact()
-    bucket.AddContact(*testContact)
-    log.Printf("There should be one thing in the bucket: %v", bucket.ItemCount)
-    bucket.Pop()
-    log.Printf("There should be nothing in the bucket: %v", bucket.ItemCount)
-    for i:=0; i<180; i++ {
-        bucket.AddContact(*testContact)
-    }
-    log.Printf("Bucket should be no more than 160: %v", bucket.ItemCount)
+    contact1 := kademlia.NewContact()
+    contact2 := kademlia.NewContact()
+    contact3 := kademlia.NewContact()
+    contact4 := kademlia.NewContact()
+    bucket.PingBucket(*contact1)
+    log.Printf("What does the bucket look like? 1", bucket)
+    bucket.PingBucket(*contact2)
+    log.Printf("What does the bucket look like? 2", bucket)
+    bucket.PingBucket(*contact3)
+    log.Printf("What does the bucket look like? 3", bucket)
+    bucket.PingBucket(*contact2)
+    log.Printf("Bumped contact 2 to bottom", bucket)
+    bucket.PingBucket(*contact4)
+    log.Printf("Added previously unknown contact", bucket)
 
     for {
         in := bufio.NewReader(os.Stdin)

@@ -17,6 +17,7 @@ func NewContact() *Contact {
     //create a new contact
     //TODO allow args for id, ip, etc
     contact := new (Contact)
+    contact.NodeID = NewRandomID()
     return contact
 }
 

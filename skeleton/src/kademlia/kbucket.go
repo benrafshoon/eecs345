@@ -33,6 +33,16 @@ func NewBucket() *Bucket {
 	return bucket
 }
 
+func (b *Bucket) PingBucket(contact Contact) {
+	//this bucket has been pinged by this contact
+	newContact := b.BumpContactToBottom(contact)
+	log.Printf("Did we find it? %v", newContact)
+	if !newContact {
+		//the contact isn't already here!
+		(*b).AddContact(contact)
+	}
+}
+
 func (b *Bucket) AddContact(contact Contact) {
 //if the bucket isn't full add the contact and 
 //put it at the bottom of the bucket. If it is full
@@ -43,6 +53,37 @@ func (b *Bucket) AddContact(contact Contact) {
 	} else {
 		b.Push(contact)
 	}
+}
+
+func (b *Bucket) BumpContactToBottom(contact Contact) bool{
+	//return true if we did it, false if we didn't find it
+	if b.isEmpty() {
+		//don't bother if it's empty
+		return false
+	}
+
+	var foundContact, tempContact ContactItem
+	isFound := true
+	//find the contact in the linked list
+	tempContact = *(b.head)
+	for isFound {
+		if tempContact.data.NodeID == contact.NodeID {
+			foundContact = tempContact
+			isFound = false
+		}
+		if tempContact.nextItem == nil {
+			return false
+		}
+		tempContact = *(tempContact.nextItem)
+	}
+
+	//clip it from the linked list
+	(*b).Push(foundContact.data) //add it to the end
+	foundContact.data = foundContact.nextItem.data //now copy the next nodes data over
+	foundContact.nextItem = foundContact.nextItem.nextItem //and clip it out of the loop
+	(*b).ItemCount--
+
+	return true
 }
 
 func (b *Bucket) Push(contact Contact) {
