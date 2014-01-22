@@ -1,5 +1,11 @@
 package kademlia
-// Contains the implementation of a bucket
+/*
+	This file contains the implementation for a k-bucket. 
+	The only function that should be needed externally is
+	NewBucket and PingBucket. PingBucket will either add
+	a contact to the bucket or send that contact to the end
+	of the bucket if it has been seen before.
+*/
 
 import (
 	"log"
