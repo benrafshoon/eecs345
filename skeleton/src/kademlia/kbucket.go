@@ -1,28 +1,94 @@
 package kademlia
-// Contains the implementation of a kbucket
+// Contains the implementation of a bucket
+
+import (
+	"log"
+)
 
 //need 160 buckets for 160 bit keys
 const bucketSize = 160
 
-type kBucket struct {
-	keys [bucketSize]int
+type Bucket struct {
+	head *ContactItem 
+	tail *ContactItem
+	ItemCount int //will be set to 0 on init
 }
 
-func NewBucket() *kBucket {
-//create a new bucket
+type ContactItem struct {
+	data Contact
+	nextItem *ContactItem
 }
 
-func MoveToBottom(key int) {
-//contact has pinged us
+func NewContactItem(contact Contact) *ContactItem {
+	item := new (ContactItem)
+	item.data = contact
+	item.nextItem = nil
+	return item
 }
 
-func Push(key int) {
-//if the bucket isn't full add the key and 
+func NewBucket() *Bucket {
+	//create a new bucket, head and tail start at 0
+	bucket := new (Bucket)
+	bucket.ItemCount = 0
+	return bucket
+}
+
+func (b *Bucket) AddContact(contact Contact) {
+//if the bucket isn't full add the contact and 
 //put it at the bottom of the bucket. If it is full
 //Then drop the top node
-
+	if b.isFull() {
+		b.Pop()
+		b.Push(contact)
+	} else {
+		b.Push(contact)
+	}
 }
 
-func Pop(key int) {
-//remove the node at the top of the bucket
+func (b *Bucket) Push(contact Contact) {
+	//add item to the tail end
+	item := NewContactItem(contact)
+
+	if (*b).isEmpty() {
+		(*b).head = item
+		(*b).tail = item
+	} else {
+		(*b).tail.nextItem = item //point the tail here
+		(*b).tail = item //make this item the tail
+	}
+
+	(*b).ItemCount++
+	return
+}
+
+func (b *Bucket) Pop() Contact{
+	//remove item from the head
+	if (*b).isEmpty(){
+		log.Fatal("Nothing to pop in queue")
+	}
+
+	oldHead := b.head.data
+	if (*b).ItemCount == 1 { //this is the only thing in the bucket
+		b.head = nil
+	} else {
+		tempNode := b.head.nextItem
+		(*b).head = tempNode
+	}
+
+	(*b).ItemCount--
+	return oldHead
+}
+
+func (b Bucket) isEmpty() bool {
+	if b.ItemCount == 0 {
+		return true
+	}
+	return false
+}
+
+func (b Bucket) isFull() bool {
+	if b.ItemCount == bucketSize {
+		return true
+	}
+	return false
 }

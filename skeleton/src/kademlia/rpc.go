@@ -13,6 +13,12 @@ type Contact struct {
     Port uint16
 }
 
+func NewContact() *Contact {
+    //create a new contact
+    //TODO allow args for id, ip, etc
+    contact := new (Contact)
+    return contact
+}
 
 // PING
 type Ping struct {

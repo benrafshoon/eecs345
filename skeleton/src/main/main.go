@@ -64,6 +64,19 @@ func main() {
     log.Printf("ping msgID: %s\n", ping.MsgID.AsString())
     log.Printf("pong msgID: %s\n", pong.MsgID.AsString())
 
+    //Testing for the basic queue of a bucket
+    log.Printf(" *** TESTING BUCKET METHODS *** \n")
+    bucket := kademlia.NewBucket()
+    testContact := kademlia.NewContact()
+    bucket.AddContact(*testContact)
+    log.Printf("There should be one thing in the bucket: %v", bucket.ItemCount)
+    bucket.Pop()
+    log.Printf("There should be nothing in the bucket: %v", bucket.ItemCount)
+    for i:=0; i<180; i++ {
+        bucket.AddContact(*testContact)
+    }
+    log.Printf("Bucket should be no more than 160: %v", bucket.ItemCount)
+
     for {
         in := bufio.NewReader(os.Stdin)
         input, err := in.ReadString('\n')
