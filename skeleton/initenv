@@ -1,0 +1,5 @@
+#!/bin/bash
+
+#Run 'source initenv'
+
+export GOPATH=`pwd`
