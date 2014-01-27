@@ -4,6 +4,7 @@ package kademlia
 import (
     "encoding/hex"
     "math/rand"
+    "errors"
 )
 
 
@@ -81,6 +82,11 @@ func CopyID(id ID) (ret ID) {
 func FromString(idstr string) (ret ID, err error) {
     bytes, err := hex.DecodeString(idstr)
     if err != nil {
+        return
+    }
+
+    if len(bytes) != IDBytes {
+        err = errors.New("Must be 160bit ID string")
         return
     }
 

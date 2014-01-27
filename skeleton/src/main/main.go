@@ -94,6 +94,16 @@ func main() {
         switch command[0] {
         case "whoami":
             log.Printf("Your node ID is: %v", kadem.NodeID)
+        case "local_find_value":
+            if len(command) < 2 {
+                log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
+            } else if id, error := kademlia.FromString(command[1]); error != nil {
+                log.Printf("Error in command \"local_find_value\": %v", error)
+            } else {
+                log.Printf("Finding local value for key %v", id)
+                fmt.Printf("ERR\n")
+            }
+            
         default:
             log.Printf("Unrecognized command: %s", command[0])
         }
