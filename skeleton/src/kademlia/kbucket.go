@@ -5,6 +5,9 @@ package kademlia
 	NewBucket and PingBucket. PingBucket will either add
 	a contact to the bucket or send that contact to the end
 	of the bucket if it has been seen before.
+
+	ContainsNode can be used to check if a nodeid is contained
+	in this bucket
 */
 
 import (
@@ -74,33 +77,45 @@ func (b *Bucket) AddContact(contact Contact) {
 
 func (b *Bucket) BumpContactToBottom(contact Contact) bool{
 	//return true if we did it, false if we didn't find it
-	if b.isEmpty() {
-		//don't bother if it's empty
-		return false
+	found, foundContact := b.ContainsNode(contact.NodeID)
+
+	if found {
+		//clip it from the linked list
+		(*b).Push(foundContact.data) //add it to the end
+		foundContact.data = foundContact.nextItem.data //now copy the next nodes data over
+		foundContact.nextItem = foundContact.nextItem.nextItem //and clip it out of the loop
+		(*b).ItemCount--
 	}
 
+	return found
+}
+
+func (b* Bucket) ContainsNode(nodeID ID) (bool,ContactItem) {
+//Takes a node id and locates it in this bucket. Returns a contactitem
+// instead of contact to support the BumpContactToBottomFunction
 	var foundContact, tempContact ContactItem
+
+	if b.isEmpty() {
+		//don't bother if it's empty
+		return false,foundContact
+	}
+
 	isFound := true
 	//find the contact in the linked list
 	tempContact = *(b.head)
 	for isFound {
-		if tempContact.data.NodeID == contact.NodeID {
+		if tempContact.data.NodeID == nodeID {
 			foundContact = tempContact
 			isFound = false
 		}
 		if tempContact.nextItem == nil {
-			return false
+			return false,foundContact
 		}
 		tempContact = *(tempContact.nextItem)
 	}
 
-	//clip it from the linked list
-	(*b).Push(foundContact.data) //add it to the end
-	foundContact.data = foundContact.nextItem.data //now copy the next nodes data over
-	foundContact.nextItem = foundContact.nextItem.nextItem //and clip it out of the loop
-	(*b).ItemCount--
+	return true,foundContact
 
-	return true
 }
 
 func (b *Bucket) Push(contact Contact) {

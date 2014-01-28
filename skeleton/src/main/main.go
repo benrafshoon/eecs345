@@ -12,6 +12,7 @@ import (
     "os"
     "bufio"
     "strings"
+    "strconv"
 )
 
 import (
@@ -78,8 +79,7 @@ func main() {
 
     */
     //Testing for the basic queue of a bucket
-    /*
-    log.Printf(" *** TESTING BUCKET METHODS *** \n")
+    /*log.Printf(" *** TESTING BUCKET METHODS *** \n")
     bucket := kademlia.NewBucket()
     contact1 := kademlia.NewContact()
     contact2 := kademlia.NewContact()
@@ -92,10 +92,8 @@ func main() {
     bucket.PingBucket(*contact3)
     log.Printf("What does the bucket look like? 3", bucket)
     bucket.PingBucket(*contact2)
-    log.Printf("Bumped contact 2 to bottom", bucket)
-    bucket.PingBucket(*contact4)
-    log.Printf("Added previously unknown contact", bucket)
-*/
+    log.Printf("Bumped contact 2 to bottom", bucket) */
+
     for {
         in := bufio.NewReader(os.Stdin)
         input, err := in.ReadString('\n')
@@ -107,7 +105,7 @@ func main() {
 
         switch command[0] {
         case "whoami":
-            fmt.Printf("%v\n", kademliaServer.GetNodeID().AsString())
+            fmt.Printf("%v\n Node ID: %v\n", kademliaServer.GetNodeID().AsString(), kademliaServer.GetNodeID())
         case "local_find_value":
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
@@ -130,6 +128,15 @@ func main() {
                     log.Printf("Ping by nodeID not yet implemented\n")
                 }
 
+            }
+        case "find_node":
+            if len(command) != 3 {
+                log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")
+            } else {
+                nodeID, _ := kademlia.FromString(command[1])
+                log.Printf("Node ID: %v\n", nodeID)
+                key, _ := strconv.Atoi(command[2])
+                kademliaServer.FindNode(nodeID, key)
             }
         default:
             log.Printf("Unrecognized command: %s", command[0])

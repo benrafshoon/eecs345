@@ -117,3 +117,8 @@ func (kademliaServer *KademliaServer) Ping(address string) {
     //Not sure if we should close the connection
     client.Close()
 }
+
+func (kademliaServer *KademliaServer) FindNode(NodeID ID, key int) {
+    distance := NodeID.Distance(kademliaServer.GetNodeID())
+    log.Printf("The distance is: %v", distance)
+}
