@@ -15,6 +15,7 @@ import (
 // Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
     selfContact *Contact
+    kBuckets KBucketList
 }
 
 func NewKademlia() *Kademlia {
@@ -22,6 +23,10 @@ func NewKademlia() *Kademlia {
     newNode := new(Kademlia)
     newNode.selfContact = new(Contact)
     newNode.selfContact.NodeID = NewRandomID()
+    newNode.kBuckets = make([]*Bucket, 160, 160)
+    
+    newNode.kBuckets = NewKBucketList()
+
     return newNode
 }
 
