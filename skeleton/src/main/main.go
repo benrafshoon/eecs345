@@ -12,6 +12,7 @@ import (
     "os"
     "bufio"
     "strings"
+    "strconv"
 )
 
 import (
@@ -104,7 +105,7 @@ func main() {
 
         switch command[0] {
         case "whoami":
-            fmt.Printf("%v\n", kademliaServer.GetNodeID().AsString())
+            fmt.Printf("%v\n Node ID: %v\n", kademliaServer.GetNodeID().AsString(), kademliaServer.GetNodeID())
         case "local_find_value":
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
@@ -127,6 +128,15 @@ func main() {
                     log.Printf("Ping by nodeID not yet implemented\n")
                 }
 
+            }
+        case "find_node":
+            if len(command) != 3 {
+                log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")
+            } else {
+                nodeID, _ := kademlia.FromString(command[1])
+                log.Printf("Node ID: %v\n", nodeID)
+                key, _ := strconv.Atoi(command[2])
+                kademliaServer.FindNode(nodeID, key)
             }
         default:
             log.Printf("Unrecognized command: %s", command[0])

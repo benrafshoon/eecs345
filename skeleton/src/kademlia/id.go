@@ -5,6 +5,7 @@ import (
     "encoding/hex"
     "math/rand"
     "errors"
+    "log"
 )
 
 
@@ -22,6 +23,18 @@ func (id ID) Xor(other ID) (ret ID) {
         ret[i] = id[i] ^ other[i]
     }
     return
+}
+
+func (id ID) Distance(other ID) (distance int) {
+    distance = 0
+    for i := 0; i<IDBytes; i++ {
+        tempdistance := int(id[i]) - int(other[i])
+        if tempdistance < 0 {
+            tempdistance = -tempdistance
+        }
+        distance = distance + tempdistance
+    }
+    return distance
 }
 
 // Return -1, 0, or 1, with the same meaning as strcmp, etc.
