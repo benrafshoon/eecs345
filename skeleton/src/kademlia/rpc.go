@@ -3,7 +3,10 @@ package kademlia
 // strictly to these to be compatible with the reference implementation and
 // other groups' code.
 
-import "net"
+import (
+    "net"
+    "log"
+)
 
 
 // Host identification.
@@ -13,11 +16,11 @@ type Contact struct {
     Port uint16
 }
 
-func NewContact() *Contact {
-    //create a new contact
-    //TODO allow args for id, ip, etc
-    contact := new (Contact)
-    contact.NodeID = NewRandomID()
+func NewContact(nodeID ID, host net.IP, port uint16) *Contact {
+    contact := new(Contact)
+    contact.NodeID = nodeID
+    contact.Host = host
+    contact.Port = port
     return contact
 }
 
@@ -33,8 +36,13 @@ type Pong struct {
 }
 
 func (k *Kademlia) Ping(ping Ping, pong *Pong) error {
+    log.Printf("Received ping from %v:%v\n", ping.Sender.Host, ping.Sender.Port)
+    log.Printf("          Node ID: %v\n", ping.Sender.NodeID.AsString())
+    log.Printf("       Message ID: %v\n", ping.MsgID.AsString())
+    log.Printf("Sending pong back\n")
     // This one's a freebie.
     pong.MsgID = CopyID(ping.MsgID)
+    pong.Sender = *k.getSelfContact()
     return nil
 }
 

@@ -6,8 +6,8 @@ import (
     "log"
     "math/rand"
     "net"
-    "net/http"
-    "net/rpc"
+    //"net/http"
+    //"net/rpc"
     "time"
     "os"
     "bufio"
@@ -33,6 +33,16 @@ func main() {
     listenStr := args[0]
     firstPeerStr := args[1]
 
+    kademliaServer := kademlia.NewKademliaServer()
+    error := kademliaServer.StartKademliaServer(listenStr)
+
+    if error != nil {
+        log.Fatal("Error starting kademlia server: ", error)
+    }
+
+    kademliaServer.Ping(firstPeerStr)
+
+    /*
     fmt.Printf("kademlia starting up!\n")
     kadem := kademlia.NewKademlia()
 
@@ -55,6 +65,8 @@ func main() {
     }
     ping := new(kademlia.Ping)
     ping.MsgID = kademlia.NewRandomID()
+
+    //contact := kadem.GetContact()
     var pong kademlia.Pong
     err = client.Call("Kademlia.Ping", ping, &pong)
     if err != nil {
@@ -64,7 +76,9 @@ func main() {
     log.Printf("ping msgID: %s\n", ping.MsgID.AsString())
     log.Printf("pong msgID: %s\n", pong.MsgID.AsString())
 
+    */
     //Testing for the basic queue of a bucket
+    /*
     log.Printf(" *** TESTING BUCKET METHODS *** \n")
     bucket := kademlia.NewBucket()
     contact1 := kademlia.NewContact()
@@ -81,7 +95,7 @@ func main() {
     log.Printf("Bumped contact 2 to bottom", bucket)
     bucket.PingBucket(*contact4)
     log.Printf("Added previously unknown contact", bucket)
-
+*/
     for {
         in := bufio.NewReader(os.Stdin)
         input, err := in.ReadString('\n')
@@ -93,7 +107,7 @@ func main() {
 
         switch command[0] {
         case "whoami":
-            log.Printf("Your node ID is: %v", kadem.NodeID)
+            fmt.Printf("%v\n", kademliaServer.GetNodeID().AsString())
         case "local_find_value":
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
@@ -103,7 +117,20 @@ func main() {
                 log.Printf("Finding local value for key %v", id)
                 fmt.Printf("ERR\n")
             }
-            
+        case "ping":
+            if len(command) < 2 {
+                log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
+            } else if _, _, error := net.SplitHostPort(command[1]); error == nil {
+                kademliaServer.Ping(command[1])
+            } else {
+                _, error := kademlia.FromString(command[1])
+                if error != nil {
+                    log.Printf("Error in command \"ping\": nodeID: %v", error)
+                } else {
+                    log.Printf("Ping by nodeID not yet implemented\n")
+                }
+
+            }
         default:
             log.Printf("Unrecognized command: %s", command[0])
         }
