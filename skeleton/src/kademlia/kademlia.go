@@ -15,6 +15,8 @@ import (
 // Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
     selfContact *Contact
+    NodeID ID
+    buckets [bucketSize]Bucket
 }
 
 func NewKademlia() *Kademlia {
@@ -112,3 +114,5 @@ func (kademliaServer *KademliaServer) Ping(address string) {
     //Not sure if we should close the connection
     client.Close()
 }
+
+func AddNode()

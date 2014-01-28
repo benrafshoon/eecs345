@@ -78,8 +78,7 @@ func main() {
 
     */
     //Testing for the basic queue of a bucket
-    /*
-    log.Printf(" *** TESTING BUCKET METHODS *** \n")
+    /*log.Printf(" *** TESTING BUCKET METHODS *** \n")
     bucket := kademlia.NewBucket()
     contact1 := kademlia.NewContact()
     contact2 := kademlia.NewContact()
@@ -92,10 +91,8 @@ func main() {
     bucket.PingBucket(*contact3)
     log.Printf("What does the bucket look like? 3", bucket)
     bucket.PingBucket(*contact2)
-    log.Printf("Bumped contact 2 to bottom", bucket)
-    bucket.PingBucket(*contact4)
-    log.Printf("Added previously unknown contact", bucket)
-*/
+    log.Printf("Bumped contact 2 to bottom", bucket) */
+
     for {
         in := bufio.NewReader(os.Stdin)
         input, err := in.ReadString('\n')
