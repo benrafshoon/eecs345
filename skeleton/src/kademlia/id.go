@@ -13,6 +13,22 @@ import (
 const IDBytes = 20
 type ID [IDBytes]byte
 
+//Kademlia IDs are big endian.  ID[0] is the MSB while ID[19] is the LSB
+//Examples
+//0100000000000000000000000000000000000000 is interpreted byte by byte
+//01-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
+//LSB-----------------------------------------------------MSB
+//High-Order----------------------------------------Low-Order
+//[19]----------------------------------------------------[0]
+//Value: 1
+
+//F000000000000000000000000000000000000000 is interpreted byte by byte
+//F0-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
+//LSB-----------------------------------------------------MSB
+//High-Order----------------------------------------Low-Order
+//[19]----------------------------------------------------[0]
+//Value: 240
+
 func (id ID) AsString() string {
     return hex.EncodeToString(id[0:IDBytes])
 }
@@ -60,7 +76,7 @@ func (id ID) Less(other ID) bool {
     return id.Compare(other) < 0
 }
 
-// Return the number of consecutive zeroes, starting from the low-order bit, in
+// Return the number of consecutive zeroes, starting from the low-order (most-significant) bit, in
 // a ID.
 func (id ID) PrefixLen() int {
     for i:= 0; i < IDBytes; i++ {
@@ -73,6 +89,19 @@ func (id ID) PrefixLen() int {
     return IDBytes * 8
 }
 
+
+func (id ID) PrefixLenFixed() int {
+    for i:= 0; i < IDBytes; i++ {
+        for j := 7; j >= 0; j-- { //We need to start at the MSB and go down
+            if (id[i] >> uint8(j)) & 0x1 != 0 {
+                //If the first 1 is at the MSB, then there are 0 prefixing 0s.
+                //If the first 1 is at the LSB, then there are 7 prefixing 0s.
+                return (8 * i) + (7 - j) 
+            }
+        }
+    }
+    return IDBytes * 8
+}
 
 // Generate a new ID from nothing.
 func NewRandomID() (ret ID) {
@@ -106,5 +135,11 @@ func FromString(idstr string) (ret ID, err error) {
         ret[i] = bytes[i]
     }
     return
+}
+
+//Distance bucket 
+//Returns -1 if the ID == otherID
+func (id ID) DistanceBucket(otherID ID) int {
+    return 159 - id.Xor(otherID).PrefixLenFixed()
 }
 
