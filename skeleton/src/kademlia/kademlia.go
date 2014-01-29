@@ -15,7 +15,7 @@ import (
 // Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
     selfContact *Contact
-    kBuckets KBucketList
+    kBuckets []*Bucket
 }
 
 func NewKademlia() *Kademlia {
@@ -23,15 +23,28 @@ func NewKademlia() *Kademlia {
     newNode := new(Kademlia)
     newNode.selfContact = new(Contact)
     newNode.selfContact.NodeID = NewRandomID()
-    newNode.kBuckets = make([]*Bucket, 160, 160)
-    
-    newNode.kBuckets = NewKBucketList()
+
+    newNode.kBuckets = make([]*Bucket, bucketSize, bucketSize)
+    for i := 0; i < bucketSize; i++ {
+        newNode.kBuckets[i] = NewBucket()
+    }
 
     return newNode
 }
 
 func (k *Kademlia) getSelfContact() *Contact {
 	return k.selfContact
+}
+
+func (k *Kademlia) updateContact(contact Contact) {
+    bucketIndex := k.selfContact.NodeID.DistanceBucket(contact.NodeID)
+    if bucketIndex != -1 {
+        log.Printf("Adding to k-bucket index %v\n", bucketIndex)
+        k.kBuckets[bucketIndex].PingBucket(contact)
+    } else {
+        //Case where received a message from self, so don't add to kbuckets
+        log.Printf("Attempting to add self to k-bucket\n")
+    }
 }
 
 
@@ -78,6 +91,7 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     go http.Serve(listener, nil)
 
     log.Printf("Starting kademlia server listening on %v:%v\n", hostIP, portInt)
+    log.Printf("Self NodeID: %v", kademliaServer.GetNodeID().AsString())
     return nil
 }
 
@@ -105,6 +119,8 @@ func (kademliaServer *KademliaServer) Ping(address string) {
     if ping.MsgID.Equals(pong.MsgID) {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
     	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
+        kademliaServer.kademlia.updateContact(pong.Sender)
+        
     } else {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
 		log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())

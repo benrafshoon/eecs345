@@ -17,16 +17,6 @@ import (
 //need 160 buckets for 160 bit keys
 const bucketSize = 160
 
-type KBucketList []*Bucket
-
-func NewKBucketList() KBucketList {
-	kBucketList := make([]*Bucket, 160, 160)
-	for i := 0; i < 160; i++ {
-		kBucketList[i] = NewBucket()
-	}
-	return kBucketList
-}
-
 
 type Bucket struct {
 	head *ContactItem 
