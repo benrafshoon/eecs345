@@ -59,4 +59,13 @@ func Test_DistanceBucket_1(t *testing.T) {
 	}
  }
 
+ func Test_DistanceBucket_4(t *testing.T) {
+ 	id := "123456789ABCDEF0123456789ABCDEF012345678"
+ 	expectedResult := -1
+ 	actualResult := test_DistanceBucket(t, id, id)
+ 	if actualResult != expectedResult {
+		t.Fatal("Expected %v, got %v", expectedResult, actualResult)
+	}
+ }
+
 
