@@ -28,13 +28,25 @@ func main() {
     // Get the bind and connect connection strings from command-line arguments.
     flag.Parse()
     args := flag.Args()
-    if len(args) != 2 {
-        log.Fatal("Must be invoked with exactly two arguments!\n")
+    if len(args) < 2 {
+        log.Fatal("Must be invoked with at least two arguments!\n")
     }
     listenStr := args[0]
     firstPeerStr := args[1]
 
-    kademliaServer := kademlia.NewKademliaServer()
+    var kademliaServer *kademlia.KademliaServer
+
+    if len(args) >= 3 {
+        testNodeID, error := kademlia.FromString(args[2])
+        if error != nil {
+            log.Fatal("Error parsing test node ID: ", error)
+        }
+        kademliaServer = kademlia.NewTestKademliaServer(testNodeID)
+
+    } else {
+        kademliaServer = kademlia.NewKademliaServer()
+    }
+    
     error := kademliaServer.StartKademliaServer(listenStr)
 
     if error != nil {
@@ -94,8 +106,10 @@ func main() {
     bucket.PingBucket(*contact2)
     log.Printf("Bumped contact 2 to bottom", bucket) */
 
-    for {
-        in := bufio.NewReader(os.Stdin)
+    in := bufio.NewReader(os.Stdin)
+    quit := false
+    for !quit {
+        
         input, err := in.ReadString('\n')
         if err != nil {
                 // handle error
@@ -138,6 +152,9 @@ func main() {
                 key, _ := strconv.Atoi(command[2])
                 kademliaServer.FindNode(nodeID, key)
             }
+        case "quit": 
+            quit = true
+
         default:
             log.Printf("Unrecognized command: %s", command[0])
         }

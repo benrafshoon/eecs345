@@ -32,6 +32,13 @@ func NewKademlia() *Kademlia {
     return newNode
 }
 
+func NewTestKademlia(nodeID ID) *Kademlia {
+    newNode := NewKademlia()
+    newNode.selfContact.NodeID = nodeID
+    return newNode
+}
+
+
 func (k *Kademlia) getSelfContact() *Contact {
 	return k.selfContact
 }
@@ -57,6 +64,12 @@ func NewKademliaServer() *KademliaServer {
 	kademliaServer := new(KademliaServer)
 	kademliaServer.kademlia = NewKademlia()
 	return kademliaServer
+}
+
+func NewTestKademliaServer(nodeID ID) *KademliaServer {
+    kademliaServer := NewKademliaServer()
+    kademliaServer.kademlia = NewTestKademlia(nodeID)
+    return kademliaServer
 }
 
 func (kademliaServer *KademliaServer) StartKademliaServer(address string) error {
