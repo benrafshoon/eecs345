@@ -61,7 +61,10 @@ func NewTestKademliaServer(nodeID ID) *KademliaServer {
 }
 
 func (kademliaServer *KademliaServer) StartKademliaServer(address string) error {
-	rpc.Register(kademliaServer.Kademlia)
+	error := rpc.Register(&kademliaServer.Kademlia)
+    if error != nil {
+        return error
+    }
     rpc.HandleHTTP()
 
     listener, error := net.Listen("tcp", address)
@@ -101,7 +104,7 @@ func (kademliaServer *KademliaServer) GetNodeID() ID {
 	return kademliaServer.selfContact.NodeID
 }
 
-func (kademliaServer *KademliaServer) Ping(address string) error {
+func (kademliaServer *KademliaServer) SendPing(address string) error {
 	
 	client, err := rpc.DialHTTP("tcp", address)
     if err != nil {
@@ -136,11 +139,13 @@ func (kademliaServer *KademliaServer) Ping(address string) error {
     return nil
 }
 
+/*
 func (kademliaServer *KademliaServer) FindNode(NodeID ID, key int) {
     distance := NodeID.Distance(kademliaServer.GetNodeID())
     log.Printf("The distance is: %v", distance)
-}
+}*/
 
+/*
 func (kademliaServer *KademliaServer) Store(NodeID ID, key ID, value []byte) {
 
-}
+}*/

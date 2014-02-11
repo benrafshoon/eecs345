@@ -12,7 +12,7 @@ import (
     "os"
     "bufio"
     "strings"
-    "strconv"
+    //"strconv"
 )
 
 import (
@@ -53,7 +53,7 @@ func main() {
         log.Fatal("Error starting kademlia server: ", error)
     }
 
-    kademliaServer.Ping(firstPeerStr)
+    kademliaServer.SendPing(firstPeerStr)
 
     /*
     fmt.Printf("kademlia starting up!\n")
@@ -149,7 +149,7 @@ func main() {
             if len(command) < 2 {
                 log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
             } else if _, _, error := net.SplitHostPort(command[1]); error == nil {
-                error := kademliaServer.Ping(command[1])
+                error := kademliaServer.SendPing(command[1])
                 if error != nil {
                     log.Println(error)
                 }
@@ -197,8 +197,8 @@ func main() {
             } else {
                 nodeID, _ := kademlia.FromString(command[1])
                 log.Printf("Node ID: %v\n", nodeID)
-                key, _ := strconv.Atoi(command[2])
-                kademliaServer.FindNode(nodeID, key)
+                //key, _ := strconv.Atoi(command[2])
+                //kademliaServer.FindNode(nodeID, key)
             }
         case "find_value":
             log.Printf("Not yet implemented")
