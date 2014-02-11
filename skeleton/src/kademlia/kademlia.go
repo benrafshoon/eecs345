@@ -16,26 +16,7 @@ import (
 type Kademlia struct {
     selfContact *Contact
     kBuckets []*Bucket
-}
-
-func NewKademlia() *Kademlia {
-    // TODO: Assign yourself a random ID and prepare other state here.
-    newNode := new(Kademlia)
-    newNode.selfContact = new(Contact)
-    newNode.selfContact.NodeID = NewRandomID()
-
-    newNode.kBuckets = make([]*Bucket, bucketSize, bucketSize)
-    for i := 0; i < bucketSize; i++ {
-        newNode.kBuckets[i] = NewBucket()
-    }
-
-    return newNode
-}
-
-func NewTestKademlia(nodeID ID) *Kademlia {
-    newNode := NewKademlia()
-    newNode.selfContact.NodeID = nodeID
-    return newNode
+    Data *KeyValueStore
 }
 
 
@@ -57,23 +38,30 @@ func (k *Kademlia) updateContact(contact Contact) {
 
 //KademliaServer contains methods that are accessible by the client program
 type KademliaServer struct {
-	kademlia *Kademlia
+	Kademlia
 }
 
 func NewKademliaServer() *KademliaServer {
 	kademliaServer := new(KademliaServer)
-	kademliaServer.kademlia = NewKademlia()
+    kademliaServer.selfContact = new(Contact)
+    kademliaServer.selfContact.NodeID = NewRandomID()
+
+    kademliaServer.kBuckets = make([]*Bucket, bucketSize, bucketSize)
+    for i := 0; i < bucketSize; i++ {
+        kademliaServer.kBuckets[i] = NewBucket()
+    }
+    kademliaServer.Data = NewKeyValueStore()
 	return kademliaServer
 }
 
 func NewTestKademliaServer(nodeID ID) *KademliaServer {
     kademliaServer := NewKademliaServer()
-    kademliaServer.kademlia = NewTestKademlia(nodeID)
+    kademliaServer.selfContact.NodeID = nodeID
     return kademliaServer
 }
 
 func (kademliaServer *KademliaServer) StartKademliaServer(address string) error {
-	rpc.Register(kademliaServer.kademlia)
+	rpc.Register(kademliaServer.Kademlia)
     rpc.HandleHTTP()
 
     listener, error := net.Listen("tcp", address)
@@ -90,13 +78,13 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     if hostIP == nil {
     	return errors.New("Invalid host")
     }
-	kademliaServer.kademlia.selfContact.Host = hostIP
+	kademliaServer.selfContact.Host = hostIP
 
     portInt, error := strconv.ParseUint(port, 10, 16)
     if error != nil {
     	return error
     }
-    kademliaServer.kademlia.selfContact.Port = uint16(portInt)
+    kademliaServer.selfContact.Port = uint16(portInt)
 
     
 
@@ -110,29 +98,29 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
 
 
 func (kademliaServer *KademliaServer) GetNodeID() ID {
-	return kademliaServer.kademlia.selfContact.NodeID
+	return kademliaServer.selfContact.NodeID
 }
 
-func (kademliaServer *KademliaServer) Ping(address string) {
+func (kademliaServer *KademliaServer) Ping(address string) error {
 	
 	client, err := rpc.DialHTTP("tcp", address)
     if err != nil {
-        log.Fatal("DialHTTP: ", err)
+        return err
     }
     log.Printf("Sending ping to %v\n", address)
 
     ping := new(Ping)
-    ping.Sender = *kademliaServer.kademlia.getSelfContact()
+    ping.Sender = *kademliaServer.getSelfContact()
     ping.MsgID = NewRandomID()
     var pong Pong
     err = client.Call("Kademlia.Ping", ping, &pong)
     if err != nil {
-        log.Fatal("Call: ", err)
+        return err
     }
     if ping.MsgID.Equals(pong.MsgID) {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
     	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
-        kademliaServer.kademlia.updateContact(pong.Sender)
+        kademliaServer.updateContact(pong.Sender)
         
     } else {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
@@ -145,9 +133,14 @@ func (kademliaServer *KademliaServer) Ping(address string) {
 
     //Not sure if we should close the connection
     client.Close()
+    return nil
 }
 
 func (kademliaServer *KademliaServer) FindNode(NodeID ID, key int) {
     distance := NodeID.Distance(kademliaServer.GetNodeID())
     log.Printf("The distance is: %v", distance)
+}
+
+func (kademliaServer *KademliaServer) Store(NodeID ID, key ID, value []byte) {
+
 }

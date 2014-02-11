@@ -124,16 +124,35 @@ func main() {
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
             } else if id, error := kademlia.FromString(command[1]); error != nil {
+
                 log.Printf("Error in command \"local_find_value\": %v", error)
             } else {
                 log.Printf("Finding local value for key %v", id)
-                fmt.Printf("ERR\n")
+                value := kademliaServer.Data.RetrieveValue(id)
+                if value != nil {
+                    fmt.Printf("%v\n", string(value))
+                } else {
+                    fmt.Printf("ERR\n")
+                }
+                
             }
+        case "get_contact":
+            log.Printf("Not yet implemented")
+        case "iterativeStore":
+            log.Printf("Not yet implemented")
+        case "iterativeFindNode":
+            log.Printf("Not yet implemented")
+        case "iterativeFindValue":
+            log.Printf("Not yet implemented")
+
         case "ping":
             if len(command) < 2 {
                 log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
             } else if _, _, error := net.SplitHostPort(command[1]); error == nil {
-                kademliaServer.Ping(command[1])
+                error := kademliaServer.Ping(command[1])
+                if error != nil {
+                    log.Println(error)
+                }
             } else {
                 _, error := kademlia.FromString(command[1])
                 if error != nil {
@@ -143,6 +162,35 @@ func main() {
                 }
 
             }
+        case "store":
+            if len(command) < 4 {
+                log.Printf("Error in command \"store\": command must be of the form \"store nodeID key value\"")
+                continue
+            }
+            nodeID, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"store\": nodeID: %v", error)
+                continue
+            }
+            key, error := kademlia.FromString(command[2])
+            if error != nil {
+                log.Printf("Error in command \"store\": key: %v", error)
+                continue
+            }
+            value := []byte(strings.SplitAfterN(input, " ", 4)[3])
+            if len(value) > 4095 {
+                value = value[0:4094]
+            }
+            log.Printf("Store in node %v: %v <- %v\n", nodeID.AsString(), key.AsString(), string(value))
+            if kademliaServer.GetNodeID().Equals(nodeID) {
+                log.Printf("Storing in self")
+                kademliaServer.Data.InsertValue(nodeID, value)
+                
+            } else {
+                log.Printf("Remote store not yet implemented")
+            }
+
+            fmt.Printf("\n")
         case "find_node":
             if len(command) != 3 {
                 log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")
@@ -152,6 +200,8 @@ func main() {
                 key, _ := strconv.Atoi(command[2])
                 kademliaServer.FindNode(nodeID, key)
             }
+        case "find_value":
+            log.Printf("Not yet implemented")
         case "quit": 
             quit = true
 
