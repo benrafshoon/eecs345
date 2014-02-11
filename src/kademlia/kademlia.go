@@ -139,6 +139,22 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
     return nil
 }
 
+//Returns hasContact?, isSelf?, contact
+func (kademliaServer *KademliaServer) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
+    bucketIndex := kademliaServer.selfContact.NodeID.DistanceBucket(lookupID)
+    log.Printf("Bucket %v", bucketIndex)
+    if bucketIndex != -1 {
+        containsNode, contact := kademliaServer.kBuckets[bucketIndex].ContainsNode(lookupID)
+        if containsNode {
+            return true, false, &contact.data
+        } else {
+            return false, false, nil
+        }
+    } else {
+        return true, true, kademliaServer.selfContact
+    }
+}
+
 /*
 func (kademliaServer *KademliaServer) FindNode(NodeID ID, key int) {
     distance := NodeID.Distance(kademliaServer.GetNodeID())

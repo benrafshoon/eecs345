@@ -124,7 +124,6 @@ func main() {
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
             } else if id, error := kademlia.FromString(command[1]); error != nil {
-
                 log.Printf("Error in command \"local_find_value\": %v", error)
             } else {
                 log.Printf("Finding local value for key %v", id)
@@ -137,7 +136,29 @@ func main() {
                 
             }
         case "get_contact":
-            log.Printf("Not yet implemented")
+            if len(command) < 2 {
+                log.Printf("Error in command \"get_contact\": must enter ID, command must be of the form \"get_contact ID\"")
+            } else {
+                id, error := kademlia.FromString(command[1])
+                if error != nil {
+                    log.Printf("Error in command \"get_contact\": %v", error)
+                } else {
+                    hasContact, isSelf, contact := kademliaServer.LookupContactByNodeID(id)
+                    if !hasContact {
+                        fmt.Printf("ERR\n")
+                    } else {
+                        if isSelf {
+                            log.Printf("Self Contact")
+                            fmt.Printf("ERR\n")
+                        } else {
+                            fmt.Printf("%v %v\n", contact.Host, contact.Port)
+                        }
+                    }
+                }
+                
+            }
+
+            
         case "iterativeStore":
             log.Printf("Not yet implemented")
         case "iterativeFindNode":

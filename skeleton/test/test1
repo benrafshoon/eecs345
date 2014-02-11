@@ -1,5 +1,0 @@
-#!/bin/bash
-
-./testkademlia localhost:3000 localhost:3000 0000000000000000000000000000000000000000 test1.1.in test1.1.out test1.1.log &
-./testkademlia localhost:3001 localhost:3000 1000000000000000000000000000000000000000 test1.2.in test1.2.out test1.2.log &
-wait $!

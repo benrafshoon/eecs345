@@ -71,40 +71,35 @@ func (b *Bucket) BumpContactToBottom(contact Contact) bool{
 
 	if found {
 		//clip it from the linked list
-		(*b).Push(foundContact.data) //add it to the end
-		foundContact.data = foundContact.nextItem.data //now copy the next nodes data over
+		b.Push(foundContact.data) //add it to the end
+		//foundContact.data = foundContact.nextItem.data //now copy the next nodes data over
 		foundContact.nextItem = foundContact.nextItem.nextItem //and clip it out of the loop
-		(*b).ItemCount--
+		b.ItemCount--
 	}
 
 	return found
 }
 
-func (b* Bucket) ContainsNode(nodeID ID) (bool,ContactItem) {
+func (b* Bucket) ContainsNode(nodeID ID) (bool, *ContactItem) {
 //Takes a node id and locates it in this bucket. Returns a contactitem
 // instead of contact to support the BumpContactToBottomFunction
-	var foundContact, tempContact ContactItem
+	contact := b.head
 
 	if b.isEmpty() {
 		//don't bother if it's empty
-		return false,foundContact
+		return false, nil
 	}
 
-	isFound := true
 	//find the contact in the linked list
-	tempContact = *(b.head)
-	for isFound {
-		if tempContact.data.NodeID == nodeID {
-			foundContact = tempContact
-			isFound = false
+
+	for b.head != nil {
+		if contact.data.NodeID.Equals(nodeID) {
+			return true, contact
 		}
-		if tempContact.nextItem == nil {
-			return false,foundContact
-		}
-		tempContact = *(tempContact.nextItem)
+		contact = contact.nextItem
 	}
 
-	return true,foundContact
+	return true, nil
 
 }
 
