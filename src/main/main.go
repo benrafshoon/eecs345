@@ -175,11 +175,17 @@ func main() {
                     log.Println(error)
                 }
             } else {
-                _, error := kademlia.FromString(command[1])
+                id, error := kademlia.FromString(command[1])
                 if error != nil {
                     log.Printf("Error in command \"ping\": nodeID: %v", error)
                 } else {
-                    log.Printf("Ping by nodeID not yet implemented\n")
+                    hasContact, isSelf, contact := kademliaServer.LookupContactByNodeID(id)
+                    if hasContact {
+                        if isSelf {
+                            log.Printf("Self contact")
+                        }
+                        kademliaServer.SendPing(contact.GetAddress())
+                    }
                 }
 
             }
