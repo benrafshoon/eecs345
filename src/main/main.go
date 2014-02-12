@@ -143,7 +143,7 @@ func main() {
                 if error != nil {
                     log.Printf("Error in command \"get_contact\": %v", error)
                 } else {
-                    hasContact, isSelf, contact := kademliaServer.LookupContactByNodeID(id)
+                    hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
                     if !hasContact {
                         fmt.Printf("ERR\n")
                     } else {
@@ -179,7 +179,7 @@ func main() {
                 if error != nil {
                     log.Printf("Error in command \"ping\": nodeID: %v", error)
                 } else {
-                    hasContact, isSelf, contact := kademliaServer.LookupContactByNodeID(id)
+                    hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
                     if hasContact {
                         if isSelf {
                             log.Printf("Self contact")
@@ -209,15 +209,16 @@ func main() {
                 value = value[0:4094]
             }
             log.Printf("Store in node %v: %v <- %v\n", nodeID.AsString(), key.AsString(), string(value))
-            if kademliaServer.GetNodeID().Equals(nodeID) {
-                log.Printf("Storing in self")
-                kademliaServer.Data.InsertValue(nodeID, value)
-                
+            hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(nodeID)
+            if hasContact {
+                if isSelf {
+                    log.Printf("Storing in self")
+                }
+                kademliaServer.SendStore(contact.GetAddress(), key, value)
+                fmt.Printf("\n")
             } else {
-                log.Printf("Remote store not yet implemented")
+                fmt.Printf("ERR\n")
             }
-
-            fmt.Printf("\n")
         case "find_node":
             if len(command) != 3 {
                 log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")

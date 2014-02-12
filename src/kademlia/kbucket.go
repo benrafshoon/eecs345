@@ -12,17 +12,125 @@ package kademlia
 
 import (
 	"log"
+	"container/list"
 )
 
 //need 160 buckets for 160 bit keys
-const bucketSize = 160
+const numKBuckets = 160
+const kBucketSize = 20
+
+type KBucketTable struct {
+	kBuckets []*kBucket
+	SelfContact *Contact
+}
+
+func NewKBucketTable() *KBucketTable {
+	table := new(KBucketTable)
+	table.SelfContact = new(Contact)
+	table.kBuckets = make([]*kBucket, numKBuckets, numKBuckets)
+	for i := 0; i < numKBuckets; i++ {
+        table.kBuckets[i] = newKBucket()
+    }
+	return table
+}
+
+func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) {
+	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(contact.NodeID)
+	if distanceBucket != -1 {
+		if !kBucketTable.kBuckets[distanceBucket].AddOrMoveToTail(contact) {
+			kBucketTable.kBuckets[distanceBucket].DeleteFromHead(contact)
+			kBucketTable.kBuckets[distanceBucket].AddToTail(contact)
+		}
+	} else {
+		log.Printf("Marking self as alive")
+	}
+	
 
 
+}
+
+func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
+
+}
+
+//Returns hasContact?, isSelf?, contact
+func (kBucketTable *KBucketTable) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
+    bucketIndex := kBucketTable.SelfContact.NodeID.DistanceBucket(lookupID)
+    log.Printf("Bucket %v", bucketIndex)
+    if bucketIndex != -1 {
+        containsNode, contact := kBucketTable.kBuckets[bucketIndex].FindContactByNodeID(lookupID)
+        if containsNode {
+            return true, false, contact
+        } else {
+            return false, false, nil
+        }
+    } else {
+        return true, true, kBucketTable.SelfContact
+    }
+}
+
+
+type kBucket struct {
+	list *list.List
+}
+
+func newKBucket() *kBucket {
+	bucket := new(kBucket)
+	bucket.list = list.New()
+	return bucket
+}
+
+func (b *kBucket) AddOrMoveToTail(contact *Contact) bool {
+	if b.IsFull() {
+		return false
+	}
+	element := b.list.Front()
+	for element != nil {
+		if element.Value.(*Contact).NodeID.Equals(contact.NodeID) {
+			b.list.MoveToBack(element)
+			return true
+		}
+	}
+	b.list.PushBack(contact)
+	return true
+}
+
+func (b *kBucket) DeleteFromHead(contact *Contact) {
+	head := b.list.Front()
+	if head != nil {
+		 b.list.Remove(head)
+	}
+}
+
+func (b *kBucket) AddToTail(contact *Contact) bool {
+	if !b.IsFull() {
+		b.list.PushBack(contact)
+		return true
+	}
+	return false
+}
+
+func (b *kBucket) FindContactByNodeID(lookupID ID) (bool, *Contact) {
+	element := b.list.Front()
+	for element != nil {
+		if element.Value.(*Contact).NodeID.Equals(lookupID) {
+			return true, element.Value.(*Contact)
+		}
+	}
+	return false, nil
+}
+
+func (b *kBucket) IsFull() bool {
+	return b.list.Len() >= numKBuckets
+}
+
+/*
 type Bucket struct {
 	head *ContactItem 
 	tail *ContactItem
 	ItemCount int //will be set to 0 on init
 }
+
 
 type ContactItem struct {
 	data Contact
@@ -150,5 +258,5 @@ func (b Bucket) isFull() bool {
 	}
 	return false
 }
-
+*/
 

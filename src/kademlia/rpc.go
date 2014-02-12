@@ -21,6 +21,10 @@ func (contact *Contact) GetAddress() string {
     return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
 }
 
+func (contact *Contact) Equals(contactToCheck *Contact) bool {
+    return contact.NodeID.Equals(contactToCheck.NodeID)
+}
+
 func NewContact(nodeID ID, host net.IP, port uint16) *Contact {
     contact := new(Contact)
     contact.NodeID = nodeID
@@ -45,9 +49,13 @@ func (k *Kademlia) Ping(ping Ping, pong *Pong) error {
     log.Printf("          Node ID: %v\n", ping.Sender.NodeID.AsString())
     log.Printf("       Message ID: %v\n", ping.MsgID.AsString())
     log.Printf("Sending pong back\n")
-    // This one's a freebie.
+    
+    
+
     pong.MsgID = CopyID(ping.MsgID)
-    pong.Sender = *k.getSelfContact()
+    pong.Sender = *k.RoutingTable.SelfContact
+
+    k.RoutingTable.MarkAlive(&ping.Sender)
     return nil
 }
 
@@ -67,8 +75,19 @@ type StoreResult struct {
 
 func (k *Kademlia) Store(req StoreRequest, res *StoreResult) error {
     k.Data.InsertValue(req.Key, req.Value)
+    log.Printf("Received store from %v:%v\n", req.Sender.Host, req.Sender.Port)
+    log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+    log.Printf("       Message ID: %v\n", req.MsgID.AsString())
+    log.Printf("              Key: %v\n", req.Key.AsString())
+    log.Printf("            Value: %v\n", string(req.Value))
+    log.Printf("Sending pong back\n")
+
+    k.Data.InsertValue(req.Key, req.Value)
+
     res.MsgID = req.MsgID
     res.Err = nil
+
+    k.RoutingTable.MarkAlive(&req.Sender)
     return nil
 }
 

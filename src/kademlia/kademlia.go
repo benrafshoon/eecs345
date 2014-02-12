@@ -14,27 +14,11 @@ import (
 //Kademlia contains methods that are remotely accessable via rpc
 // Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
-    selfContact *Contact
-    kBuckets []*Bucket
+    //selfContact *Contact
+    //kBuckets []*Bucket
+    RoutingTable *KBucketTable
     Data *KeyValueStore
 }
-
-
-func (k *Kademlia) getSelfContact() *Contact {
-	return k.selfContact
-}
-
-func (k *Kademlia) updateContact(contact Contact) {
-    bucketIndex := k.selfContact.NodeID.DistanceBucket(contact.NodeID)
-    if bucketIndex != -1 {
-        log.Printf("Adding to k-bucket index %v\n", bucketIndex)
-        k.kBuckets[bucketIndex].PingBucket(contact)
-    } else {
-        //Case where received a message from self, so don't add to kbuckets
-        log.Printf("Attempting to add self to k-bucket\n")
-    }
-}
-
 
 //KademliaServer contains methods that are accessible by the client program
 type KademliaServer struct {
@@ -43,20 +27,21 @@ type KademliaServer struct {
 
 func NewKademliaServer() *KademliaServer {
 	kademliaServer := new(KademliaServer)
-    kademliaServer.selfContact = new(Contact)
-    kademliaServer.selfContact.NodeID = NewRandomID()
+    kademliaServer.RoutingTable = NewKBucketTable()
+    kademliaServer.RoutingTable.SelfContact.NodeID = NewRandomID()
 
-    kademliaServer.kBuckets = make([]*Bucket, bucketSize, bucketSize)
+    /*kademliaServer.kBuckets = make([]*Bucket, bucketSize, bucketSize)
     for i := 0; i < bucketSize; i++ {
         kademliaServer.kBuckets[i] = NewBucket()
-    }
+    }*/
+    
     kademliaServer.Data = NewKeyValueStore()
 	return kademliaServer
 }
 
 func NewTestKademliaServer(nodeID ID) *KademliaServer {
     kademliaServer := NewKademliaServer()
-    kademliaServer.selfContact.NodeID = nodeID
+    kademliaServer.RoutingTable.SelfContact.NodeID = nodeID
     return kademliaServer
 }
 
@@ -81,13 +66,13 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     if hostIP == nil {
     	return errors.New("Invalid host")
     }
-	kademliaServer.selfContact.Host = hostIP
+	kademliaServer.RoutingTable.SelfContact.Host = hostIP
 
     portInt, error := strconv.ParseUint(port, 10, 16)
     if error != nil {
     	return error
     }
-    kademliaServer.selfContact.Port = uint16(portInt)
+    kademliaServer.RoutingTable.SelfContact.Port = uint16(portInt)
 
     
 
@@ -95,13 +80,13 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     go http.Serve(listener, nil)
 
     log.Printf("Starting kademlia server listening on %v:%v\n", hostIP, portInt)
-    log.Printf("Self NodeID: %v", kademliaServer.GetNodeID().AsString())
+    log.Printf("Self NodeID: %v", kademliaServer.RoutingTable.SelfContact.NodeID.AsString())
     return nil
 }
 
 
 func (kademliaServer *KademliaServer) GetNodeID() ID {
-	return kademliaServer.selfContact.NodeID
+	return kademliaServer.RoutingTable.SelfContact.NodeID
 }
 
 func (kademliaServer *KademliaServer) SendPing(address string) error {
@@ -113,7 +98,7 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
     log.Printf("Sending ping to %v\n", address)
 
     ping := new(Ping)
-    ping.Sender = *kademliaServer.getSelfContact()
+    ping.Sender = *kademliaServer.RoutingTable.SelfContact
     ping.MsgID = NewRandomID()
     var pong Pong
     err = client.Call("Kademlia.Ping", ping, &pong)
@@ -123,7 +108,7 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
     if ping.MsgID.Equals(pong.MsgID) {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
     	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
-        kademliaServer.updateContact(pong.Sender)
+        kademliaServer.RoutingTable.MarkAlive(&pong.Sender)
         
     } else {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
@@ -131,7 +116,7 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
 		log.Printf("Incorrect MsgID\n");
 		log.Printf("  Ping Message ID: %v\n", ping.MsgID.AsString())
 		log.Printf("  Pong Message ID: %v\n", pong.MsgID.AsString())
-
+        //Probably should mark dead
     }
 
     //Not sure if we should close the connection
@@ -139,29 +124,36 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
     return nil
 }
 
-//Returns hasContact?, isSelf?, contact
-func (kademliaServer *KademliaServer) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
-    bucketIndex := kademliaServer.selfContact.NodeID.DistanceBucket(lookupID)
-    log.Printf("Bucket %v", bucketIndex)
-    if bucketIndex != -1 {
-        containsNode, contact := kademliaServer.kBuckets[bucketIndex].ContainsNode(lookupID)
-        if containsNode {
-            return true, false, &contact.data
-        } else {
-            return false, false, nil
-        }
-    } else {
-        return true, true, kademliaServer.selfContact
+func (kademliaServer *KademliaServer) SendStore(address string, key ID, value []byte) error {
+    client, err := rpc.DialHTTP("tcp", address)
+    if err != nil {
+        return err
     }
+    log.Printf("Sending store to %v\n", address)
+    storeRequest := new(StoreRequest)
+    storeRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    storeRequest.MsgID = NewRandomID()
+    storeRequest.Key = key
+    storeRequest.Value = value
+
+    storeResult := new(StoreResult)
+    err = client.Call("Kademlia.Store", storeRequest, storeResult)
+    if err != nil {
+        return err
+    }
+
+    if storeRequest.MsgID.Equals(storeResult.MsgID) {
+        log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
+        log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
+        kademliaServer.RoutingTable.MarkAlive(&storeRequest.Sender)
+    } else {
+        log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
+        log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
+        log.Printf("Incorrect MsgID\n");
+        log.Printf("      Request Message ID: %v\n", storeRequest.MsgID.AsString())
+        log.Printf("       Result Message ID: %v\n", storeResult.MsgID.AsString())
+        //Probably should mark dead
+    }
+    client.Close()
+    return nil
 }
-
-/*
-func (kademliaServer *KademliaServer) FindNode(NodeID ID, key int) {
-    distance := NodeID.Distance(kademliaServer.GetNodeID())
-    log.Printf("The distance is: %v", distance)
-}*/
-
-/*
-func (kademliaServer *KademliaServer) Store(NodeID ID, key ID, value []byte) {
-
-}*/
