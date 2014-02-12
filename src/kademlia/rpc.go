@@ -21,6 +21,10 @@ func (contact *Contact) GetAddress() string {
     return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
 }
 
+func (contact *Contact) ToFoundNode() FoundNode {
+    return FoundNode{contact.Host.String(), contact.Port, contact.NodeID}
+}
+
 func (contact *Contact) Equals(contactToCheck *Contact) bool {
     return contact.NodeID.Equals(contactToCheck.NodeID)
 }
@@ -80,7 +84,6 @@ func (k *Kademlia) Store(req StoreRequest, res *StoreResult) error {
     log.Printf("       Message ID: %v\n", req.MsgID.AsString())
     log.Printf("              Key: %v\n", req.Key.AsString())
     log.Printf("            Value: %v\n", string(req.Value))
-    log.Printf("Sending pong back\n")
 
     k.Data.InsertValue(req.Key, req.Value)
 
@@ -105,6 +108,14 @@ type FoundNode struct {
     NodeID ID
 }
 
+func (f FoundNode) ToContact() *Contact {
+    contact := new(Contact)
+    contact.NodeID = f.NodeID
+    contact.Host = net.ParseIP(f.IPAddr)
+    contact.Port = f.Port
+    return contact
+}
+
 type FindNodeResult struct {
     MsgID ID
     Nodes []FoundNode
@@ -112,7 +123,24 @@ type FindNodeResult struct {
 }
 
 func (k *Kademlia) FindNode(req FindNodeRequest, res *FindNodeResult) error {
-    // TODO: Implement.
+    log.Printf("Received Find Node from %v:%v\n", req.Sender.Host, req.Sender.Port)
+    log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+    log.Printf("  Node ID To Find: %v\n", req.NodeID.AsString())
+
+
+    contacts := k.RoutingTable.FindKClosestNodes(const_k, req.NodeID, req.Sender.NodeID)
+
+    res.MsgID = req.MsgID
+    res.Nodes = make([]FoundNode, len(contacts), len(contacts))
+
+    for i := 0; i < len(res.Nodes); i++ {
+        res.Nodes[i] = contacts[i].ToFoundNode()
+    }
+
+    res.Err = nil
+    
+    k.RoutingTable.MarkAlive(&req.Sender)
+
     return nil
 }
 

@@ -140,6 +140,6 @@ func FromString(idstr string) (ret ID, err error) {
 //Distance bucket 
 //Returns -1 if the ID == otherID
 func (id ID) DistanceBucket(otherID ID) int {
-    return 159 - id.Xor(otherID).PrefixLenFixed()
+    return (const_B - 1) - id.Xor(otherID).PrefixLenFixed()
 }
 

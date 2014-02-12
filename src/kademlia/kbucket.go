@@ -15,10 +15,6 @@ import (
 	"container/list"
 )
 
-//need 160 buckets for 160 bit keys
-const numKBuckets = 160
-const kBucketSize = 20
-
 type KBucketTable struct {
 	kBuckets []*kBucket
 	SelfContact *Contact
@@ -27,8 +23,8 @@ type KBucketTable struct {
 func NewKBucketTable() *KBucketTable {
 	table := new(KBucketTable)
 	table.SelfContact = new(Contact)
-	table.kBuckets = make([]*kBucket, numKBuckets, numKBuckets)
-	for i := 0; i < numKBuckets; i++ {
+	table.kBuckets = make([]*kBucket, const_B, const_B)
+	for i := 0; i < const_B; i++ {
         table.kBuckets[i] = newKBucket()
     }
 	return table
@@ -51,6 +47,65 @@ func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) {
 
 func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
 
+}
+
+//Exact search that exhaustivly searches through the entire k_bucket table
+//runtime: O(number of nodes in the routing table * k)
+func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude ID) []*Contact {
+	kClosest := make([]*Contact, 0, k)
+
+	kClosest = insertIntoClosestSoFar(kClosest, kBucketTable.SelfContact, closestTo, exclude)
+	for i := 0; i < len(kBucketTable.kBuckets); i++ {
+		kBucketList := kBucketTable.kBuckets[i].list
+		element := kBucketList.Front()
+		for element != nil {
+			kClosest = insertIntoClosestSoFar(kClosest, element.Value.(*Contact), closestTo, exclude)
+			element = element.Next()
+		}
+		
+	}
+
+	return kClosest
+
+}
+
+func intMin(a int, b int) int {
+	if(a < b) {
+		return a
+	} else {
+		return b
+	}
+}
+
+func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestTo ID, exclude ID) []*Contact {
+	if toInsert.NodeID.Equals(exclude) {
+		return closestSoFar
+	}
+
+	for i := 0; i < len(closestSoFar); i++ {
+		if toInsert.NodeID.DistanceBucket(closestTo) < closestSoFar[i].NodeID.DistanceBucket(closestTo) {
+			//Insert toInsert at position i
+
+			if len(closestSoFar) < cap(closestSoFar) {
+				closestSoFar = closestSoFar[0:len(closestSoFar) + 1]
+			}
+
+			for j := intMin(len(closestSoFar) - 1, cap(closestSoFar) - 2); j >= i; j-- {
+				closestSoFar[j + 1] = closestSoFar[j]
+			}
+
+			closestSoFar[i] = toInsert
+
+			return closestSoFar
+		}
+	}
+	//if len < cap, append to end
+	if len(closestSoFar) < cap(closestSoFar) {
+		closestSoFar = closestSoFar[0:len(closestSoFar) + 1]
+		closestSoFar[len(closestSoFar) - 1] = toInsert
+	}
+
+	return closestSoFar
 }
 
 //Returns hasContact?, isSelf?, contact
@@ -121,7 +176,7 @@ func (b *kBucket) FindContactByNodeID(lookupID ID) (bool, *Contact) {
 }
 
 func (b *kBucket) IsFull() bool {
-	return b.list.Len() >= numKBuckets
+	return b.list.Len() >= const_k
 }
 
 /*

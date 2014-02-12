@@ -220,14 +220,48 @@ func main() {
                 fmt.Printf("ERR\n")
             }
         case "find_node":
-            if len(command) != 3 {
+            if len(command) < 3 {
                 log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")
-            } else {
-                nodeID, _ := kademlia.FromString(command[1])
-                log.Printf("Node ID: %v\n", nodeID)
-                //key, _ := strconv.Atoi(command[2])
-                //kademliaServer.FindNode(nodeID, key)
+                continue
             }
+            nodeID, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"find_node\": nodeID: %v", error)
+                continue
+            }
+
+            nodeToFind, error := kademlia.FromString(command[2])
+            if error != nil {
+                log.Printf("Error in command \"find_node\": key: %v", error)
+                continue
+            }
+            log.Printf("Finding nodes close to %v from node %v", nodeID.AsString(), nodeToFind.AsString())
+
+            hasContact, _, contact := kademliaServer.RoutingTable.LookupContactByNodeID(nodeID)
+            if !hasContact {
+                fmt.Printf("ERR\n")
+                continue
+            }
+            error, foundContacts := kademliaServer.SendFindNode(contact.GetAddress(), nodeToFind)
+            if error != nil {
+                log.Printf("%v", error)
+                fmt.Printf("ERR\n")
+                continue
+            }
+
+            foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+
+            log.Printf("NodeIDs found: ")
+            
+            for i := 0; i < len(foundContacts); i++ {
+                foundIDs[i] = foundContacts[i].NodeID    
+
+                log.Printf("%v", foundIDs[i].AsString())
+            }
+
+
+            fmt.Printf("%v\n", foundIDs)
+
         case "find_value":
             log.Printf("Not yet implemented")
         case "quit": 

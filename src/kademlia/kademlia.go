@@ -11,6 +11,11 @@ import (
 	"errors"
 )
 
+
+const const_alpha = 3
+const const_B = 160
+const const_k = 20
+
 //Kademlia contains methods that are remotely accessable via rpc
 // Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
@@ -156,4 +161,42 @@ func (kademliaServer *KademliaServer) SendStore(address string, key ID, value []
     }
     client.Close()
     return nil
+}
+
+func (kademliaServer *KademliaServer) SendFindNode(address string, nodeToFind ID) (error, []*Contact) {
+    client, err := rpc.DialHTTP("tcp", address)
+    if err != nil {
+        return err, nil
+    }
+    log.Printf("Sending find node to %v\n", address)
+    findNodeRequest := new(FindNodeRequest)
+    findNodeRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    findNodeRequest.MsgID = NewRandomID()
+    findNodeRequest.NodeID = nodeToFind
+
+    findNodeResult := new(FindNodeResult)
+    err = client.Call("Kademlia.FindNode", findNodeRequest, findNodeResult)
+    if err != nil {
+        return err, nil
+    }
+
+    log.Printf("Received response from %v:%v\n", findNodeRequest.Sender.Host, findNodeRequest.Sender.Port)
+    log.Printf("              Node ID: %v\n", findNodeRequest.Sender.NodeID.AsString())
+    if findNodeRequest.MsgID.Equals(findNodeResult.MsgID) {
+        kademliaServer.RoutingTable.MarkAlive(&findNodeRequest.Sender)
+        contacts := make([]*Contact, len(findNodeResult.Nodes), len(findNodeResult.Nodes))
+
+        for i := 0; i < len(findNodeResult.Nodes); i++ {
+            contacts[i] = findNodeResult.Nodes[i].ToContact()
+        }
+        return nil, contacts
+
+    } else {
+        log.Printf("Incorrect MsgID\n");
+        log.Printf("      Request Message ID: %v\n", findNodeRequest.MsgID.AsString())
+        log.Printf("       Result Message ID: %v\n", findNodeResult.MsgID.AsString())
+        return errors.New("Incorrect MsgID"), nil
+    }
+    client.Close()
+    return nil, nil
 }
