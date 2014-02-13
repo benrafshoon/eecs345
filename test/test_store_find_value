@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#store instance
+./testkademlia localhost:4000 localhost:4000 1000000000000000000000000000000000000000 test_store_find_value.store.in test_store_find_value.store.out test_store_find_value.store.log &
+
+#retrieve instance
+./testkademlia localhost:4001 localhost:4000 5000000000000000000000000000000000000000 test_store_find_value.retrieve.in test_store_find_value.retrieve.out test_store_find_value.retrieve.log &
+
+wait
+
+diff test_store_find_value.retrieve.out test_store_find_value.retrieve.out.expected >&1

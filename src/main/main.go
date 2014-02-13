@@ -126,7 +126,7 @@ func main() {
             } else if id, error := kademlia.FromString(command[1]); error != nil {
                 log.Printf("Error in command \"local_find_value\": %v", error)
             } else {
-                log.Printf("Finding local value for key %v", id)
+                log.Printf("Finding local value for key %v", id.AsString())
                 value := kademliaServer.Data.RetrieveValue(id)
                 if value != nil {
                     fmt.Printf("%v\n", string(value))
@@ -235,7 +235,7 @@ func main() {
                 log.Printf("Error in command \"find_node\": key: %v", error)
                 continue
             }
-            log.Printf("Finding nodes close to %v from node %v", nodeID.AsString(), nodeToFind.AsString())
+            log.Printf("Finding nodes close to %v from node %v", nodeToFind.AsString(), nodeID.AsString())
 
             hasContact, _, contact := kademliaServer.RoutingTable.LookupContactByNodeID(nodeID)
             if !hasContact {
@@ -252,7 +252,7 @@ func main() {
             foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
 
             log.Printf("NodeIDs found: ")
-            
+
             for i := 0; i < len(foundContacts); i++ {
                 foundIDs[i] = foundContacts[i].NodeID    
 
@@ -263,7 +263,52 @@ func main() {
             fmt.Printf("%v\n", foundIDs)
 
         case "find_value":
-            log.Printf("Not yet implemented")
+            if len(command) < 3 {
+                log.Printf("Error in command \"find_value\": command must be of the form \"find_node nodeID key\"")
+                continue
+            }
+            nodeID, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"find_value\": nodeID: %v", error)
+                continue
+            }
+
+            key, error := kademlia.FromString(command[2])
+            if error != nil {
+                log.Printf("Error in command \"find_value\": key: %v", error)
+                continue
+            }
+            log.Printf("Finding value with key %v from node %v", key.AsString(), nodeID.AsString())
+
+            hasContact, _, contact := kademliaServer.RoutingTable.LookupContactByNodeID(nodeID)
+            if !hasContact {
+                fmt.Printf("ERR\n")
+                continue
+            }
+            error, foundValue, foundContacts := kademliaServer.SendFindValue(contact.GetAddress(), key)
+            if error != nil {
+                log.Printf("%v", error)
+                fmt.Printf("ERR\n")
+                continue
+            }
+            if foundValue != nil {
+                log.Printf("Found value: ")
+                fmt.Printf("%v %v\n", nodeID, string(foundValue))
+            } else {
+                foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+
+                log.Printf("No value, but NodeIDs found: ")
+                
+                for i := 0; i < len(foundContacts); i++ {
+                    foundIDs[i] = foundContacts[i].NodeID    
+
+                    log.Printf("%v", foundIDs[i].AsString())
+                }
+
+
+                fmt.Printf("%v\n", foundIDs)
+            }
+
         case "quit": 
             quit = true
 

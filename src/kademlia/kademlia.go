@@ -180,8 +180,8 @@ func (kademliaServer *KademliaServer) SendFindNode(address string, nodeToFind ID
         return err, nil
     }
 
-    log.Printf("Received response from %v:%v\n", findNodeRequest.Sender.Host, findNodeRequest.Sender.Port)
-    log.Printf("              Node ID: %v\n", findNodeRequest.Sender.NodeID.AsString())
+    log.Printf("Received response\n")
+
     if findNodeRequest.MsgID.Equals(findNodeResult.MsgID) {
         kademliaServer.RoutingTable.MarkAlive(&findNodeRequest.Sender)
         contacts := make([]*Contact, len(findNodeResult.Nodes), len(findNodeResult.Nodes))
@@ -199,4 +199,45 @@ func (kademliaServer *KademliaServer) SendFindNode(address string, nodeToFind ID
     }
     client.Close()
     return nil, nil
+}
+
+func (kademliaServer *KademliaServer) SendFindValue(address string, key ID) (error, []byte, []*Contact) {
+    client, err := rpc.DialHTTP("tcp", address)
+    if err != nil {
+        return err, nil, nil
+    }
+    log.Printf("Sending find value to %v\n", address)
+    log.Printf("         Key to find: %v\n", key.AsString())
+    findValueRequest := new(FindValueRequest)
+    findValueRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    findValueRequest.MsgID = NewRandomID()
+    findValueRequest.Key = key
+
+    findValueResult := new(FindValueResult)
+    err = client.Call("Kademlia.FindValue", findValueRequest, findValueResult)
+    if err != nil {
+        return err, nil, nil
+    }
+
+    log.Printf("Received response\n")
+    if findValueRequest.MsgID.Equals(findValueResult.MsgID) {
+        kademliaServer.RoutingTable.MarkAlive(&findValueRequest.Sender)
+        if findValueResult.Value != nil {
+            return nil, findValueResult.Value, nil
+        } else {
+            contacts := make([]*Contact, len(findValueResult.Nodes), len(findValueResult.Nodes))
+            for i := 0; i < len(findValueResult.Nodes); i++ {
+                contacts[i] = findValueResult.Nodes[i].ToContact()
+            }
+            return nil, nil, contacts
+        }
+
+    } else {
+        log.Printf("Incorrect MsgID\n");
+        log.Printf("      Request Message ID: %v\n", findValueRequest.MsgID.AsString())
+        log.Printf("       Result Message ID: %v\n", findValueResult.MsgID.AsString())
+        return errors.New("Incorrect MsgID"), nil, nil
+    }
+    client.Close()
+    return nil, nil, nil
 }

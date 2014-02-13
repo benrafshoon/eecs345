@@ -162,7 +162,23 @@ type FindValueResult struct {
 }
 
 func (k *Kademlia) FindValue(req FindValueRequest, res *FindValueResult) error {
-    // TODO: Implement.
+    log.Printf("Received Find Value from %v:%v\n", req.Sender.Host, req.Sender.Port)
+    log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+    log.Printf("      Key To Find: %v\n", req.Key.AsString())
+
+    res.MsgID = req.MsgID
+    res.Value = k.Data.RetrieveValue(req.Key)
+    if res.Value == nil {
+        contacts := k.RoutingTable.FindKClosestNodes(const_k, req.Key, req.Sender.NodeID)
+
+        res.Nodes = make([]FoundNode, len(contacts), len(contacts))
+        for i := 0; i < len(res.Nodes); i++ {
+            res.Nodes[i] = contacts[i].ToFoundNode()
+        }
+    }
+
+    k.RoutingTable.MarkAlive(&req.Sender)
+
     return nil
 }
 
