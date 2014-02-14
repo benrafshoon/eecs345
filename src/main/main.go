@@ -55,57 +55,6 @@ func main() {
 
     kademliaServer.SendPing(firstPeerStr)
 
-    /*
-    fmt.Printf("kademlia starting up!\n")
-    kadem := kademlia.NewKademlia()
-
-    rpc.Register(kadem)
-    rpc.HandleHTTP()
-    l, err := net.Listen("tcp", listenStr)
-    if err != nil {
-        log.Fatal("Listen: ", err)
-    }
-
-    // Serve forever.
-    go http.Serve(l, nil)
-
-    // Confirm our server is up with a PING request and then exit.
-    // Your code should loop forever, reading instructions from stdin and
-    // printing their results to stdout. See README.txt for more details.
-    client, err := rpc.DialHTTP("tcp", firstPeerStr)
-    if err != nil {
-        log.Fatal("DialHTTP: ", err)
-    }
-    ping := new(kademlia.Ping)
-    ping.MsgID = kademlia.NewRandomID()
-
-    //contact := kadem.GetContact()
-    var pong kademlia.Pong
-    err = client.Call("Kademlia.Ping", ping, &pong)
-    if err != nil {
-        log.Fatal("Call: ", err)
-    }
-
-    log.Printf("ping msgID: %s\n", ping.MsgID.AsString())
-    log.Printf("pong msgID: %s\n", pong.MsgID.AsString())
-
-    */
-    //Testing for the basic queue of a bucket
-    /*log.Printf(" *** TESTING BUCKET METHODS *** \n")
-    bucket := kademlia.NewBucket()
-    contact1 := kademlia.NewContact()
-    contact2 := kademlia.NewContact()
-    contact3 := kademlia.NewContact()
-    contact4 := kademlia.NewContact()
-    bucket.PingBucket(*contact1)
-    log.Printf("What does the bucket look like? 1", bucket)
-    bucket.PingBucket(*contact2)
-    log.Printf("What does the bucket look like? 2", bucket)
-    bucket.PingBucket(*contact3)
-    log.Printf("What does the bucket look like? 3", bucket)
-    bucket.PingBucket(*contact2)
-    log.Printf("Bumped contact 2 to bottom", bucket) */
-
     in := bufio.NewReader(os.Stdin)
     quit := false
     for !quit {

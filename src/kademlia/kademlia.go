@@ -34,11 +34,6 @@ func NewKademliaServer() *KademliaServer {
 	kademliaServer := new(KademliaServer)
     kademliaServer.RoutingTable = NewKBucketTable()
     kademliaServer.RoutingTable.SelfContact.NodeID = NewRandomID()
-
-    /*kademliaServer.kBuckets = make([]*Bucket, bucketSize, bucketSize)
-    for i := 0; i < bucketSize; i++ {
-        kademliaServer.kBuckets[i] = NewBucket()
-    }*/
     
     kademliaServer.Data = NewKeyValueStore()
 	return kademliaServer
