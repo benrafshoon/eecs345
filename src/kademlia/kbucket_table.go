@@ -10,55 +10,6 @@ type KBucketTableRequest interface {
 	RequestType() string
 }
 
-type MarkAliveRequest struct {
-	contact *Contact
-}
-
-func (r MarkAliveRequest) RequestType() string {
-	return "MarkAlive"
-}
-
-//No response
-
-type MarkDeadRequest struct {
-	contact *Contact
-}
-
-func (r MarkDeadRequest) RequestType() string {
-	return "MarkDead"
-}
-//No response
-
-type FindKClosestNodesRequest struct {
-	k int
-	closestTo ID
-	exclude ID
-	result chan FindKClosestNodesResult
-}
-
-func (r FindKClosestNodesRequest) RequestType() string {
-	return "FindKClosestNodes"
-}
-
-type FindKClosestNodesResult struct {
-	kClosestNodes []*Contact
-}
-
-type LookupContactByNodeIDRequest struct {
-	lookupID ID
-	result chan LookupContactByNodeIDResult
-}
-
-func (r LookupContactByNodeIDRequest) RequestType() string {
-	return "LookupContactByNodeID"
-}
-
-type LookupContactByNodeIDResult struct {
-	hasContact bool
-	isSelf bool
-	contact *Contact
-}
-
 
 
 type KBucketTable struct {
@@ -78,6 +29,41 @@ func NewKBucketTable() *KBucketTable {
     go table.processKBucketTableRequests()
 	return table
 }
+
+//Thread-safe
+func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) {
+	log.Printf("Sending MarkAlive request")
+	request := MarkAliveRequest{contact}
+	kBucketTable.requests <- request
+}
+
+//Thread-safe
+func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
+	log.Printf("Sending MarkDead request")
+	request := MarkDeadRequest{contact}
+	kBucketTable.requests <- request
+}
+
+
+//Thread-safe
+func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude ID) []*Contact {
+	log.Printf("Sending FindKClosestNodes request")
+	request := FindKClosestNodesRequest{k, closestTo, exclude, make(chan FindKClosestNodesResult)}
+	kBucketTable.requests <- request
+	result := <- request.result
+	return result.kClosestNodes
+}
+
+//Thread-safe
+//Returns hasContact?, isSelf?, contact
+func (kBucketTable *KBucketTable) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
+    log.Printf("Sending LookupContactByNodeID request")
+    request := LookupContactByNodeIDRequest{lookupID, make(chan LookupContactByNodeIDResult)}
+    kBucketTable.requests <- request
+    result := <- request.result
+    return result.hasContact, result.isSelf, result.contact
+}
+
 
 func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 	log.Printf("Processing k-bucket table requests")
@@ -103,6 +89,17 @@ func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 }
 
 
+
+type MarkAliveRequest struct {
+	contact *Contact
+}
+
+func (r MarkAliveRequest) RequestType() string {
+	return "MarkAlive"
+}
+
+//No response
+
 func (kBucketTable *KBucketTable) markAliveInternal(request MarkAliveRequest) {
 	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
 	if distanceBucket != -1 {
@@ -116,10 +113,38 @@ func (kBucketTable *KBucketTable) markAliveInternal(request MarkAliveRequest) {
 	}
 }
 
+
+
+
+type MarkDeadRequest struct {
+	contact *Contact
+}
+
+func (r MarkDeadRequest) RequestType() string {
+	return "MarkDead"
+}
+//No response
+
 func (kBucketTable *KBucketTable) markDeadInternal(request MarkDeadRequest) {
 	log.Printf("Mark dead not yet implemented")
 }
 
+
+
+type FindKClosestNodesRequest struct {
+	k int
+	closestTo ID
+	exclude ID
+	result chan FindKClosestNodesResult
+}
+
+func (r FindKClosestNodesRequest) RequestType() string {
+	return "FindKClosestNodes"
+}
+
+type FindKClosestNodesResult struct {
+	kClosestNodes []*Contact
+}
 
 //Exact search that exhaustivly searches through the entire k_bucket table
 //runtime: O(number of nodes in the routing table * k)
@@ -140,6 +165,23 @@ func (kBucketTable *KBucketTable) findKClosestNodesInternal(request FindKClosest
 
 	request.result <- FindKClosestNodesResult{kClosest}
 
+}
+
+
+
+type LookupContactByNodeIDRequest struct {
+	lookupID ID
+	result chan LookupContactByNodeIDResult
+}
+
+func (r LookupContactByNodeIDRequest) RequestType() string {
+	return "LookupContactByNodeID"
+}
+
+type LookupContactByNodeIDResult struct {
+	hasContact bool
+	isSelf bool
+	contact *Contact
 }
 
 func (kBucketTable *KBucketTable) lookupContactByNodeIDInternal(request LookupContactByNodeIDRequest) {
@@ -203,38 +245,6 @@ func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestT
 }
 
 
-//Thread-safe
-func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) {
-	log.Printf("Sending MarkAlive request")
-	request := MarkAliveRequest{contact}
-	kBucketTable.requests <- request
-}
 
-//Thread-safe
-func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
-	log.Printf("Sending MarkDead request")
-	request := MarkDeadRequest{contact}
-	kBucketTable.requests <- request
-}
-
-
-//Thread-safe
-func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude ID) []*Contact {
-	log.Printf("Sending FindKClosestNodes request")
-	request := FindKClosestNodesRequest{k, closestTo, exclude, make(chan FindKClosestNodesResult)}
-	kBucketTable.requests <- request
-	result := <- request.result
-	return result.kClosestNodes
-}
-
-//Thread-safe
-//Returns hasContact?, isSelf?, contact
-func (kBucketTable *KBucketTable) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
-    log.Printf("Sending LookupContactByNodeID request")
-    request := LookupContactByNodeIDRequest{lookupID, make(chan LookupContactByNodeIDResult)}
-    kBucketTable.requests <- request
-    result := <- request.result
-    return result.hasContact, result.isSelf, result.contact
-}
 
 
