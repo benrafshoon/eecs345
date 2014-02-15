@@ -89,13 +89,23 @@ func (kademliaServer *KademliaServer) GetNodeID() ID {
 	return kademliaServer.RoutingTable.SelfContact.NodeID
 }
 
-func (kademliaServer *KademliaServer) SendPing(address string) error {
-	
-	client, err := rpc.DialHTTP("tcp", address)
+func (kademliaServer *KademliaServer) markAliveAndPossiblyPing(contact *Contact) {
+    needToPing, contactToPing := kademliaServer.RoutingTable.MarkAlive(contact)
+    if needToPing {
+        go kademliaServer.SendPing(contactToPing)
+    }
+}
+
+//The contact to send a ping to is not required to have a NodeID
+func (kademliaServer *KademliaServer) SendPing(contact *Contact) error {
+	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
     if err != nil {
+        log.Printf("Connection error, marking node dead")
+        kademliaServer.RoutingTable.MarkDead(contact)
         return err
     }
-    log.Printf("Sending ping to %v\n", address)
+
+    log.Printf("Sending ping to %v\n", contact.GetAddress())
 
     ping := new(Ping)
     ping.Sender = *kademliaServer.RoutingTable.SelfContact
@@ -103,6 +113,8 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
     var pong Pong
     err = client.Call("Kademlia.Ping", ping, &pong)
     if err != nil {
+        log.Printf("Error in remote node response, marking node dead")
+        kademliaServer.RoutingTable.MarkDead(contact)
         return err
     }
     if ping.MsgID.Equals(pong.MsgID) {
@@ -116,7 +128,8 @@ func (kademliaServer *KademliaServer) SendPing(address string) error {
 		log.Printf("Incorrect MsgID\n");
 		log.Printf("  Ping Message ID: %v\n", ping.MsgID.AsString())
 		log.Printf("  Pong Message ID: %v\n", pong.MsgID.AsString())
-        //Probably should mark dead
+        
+        kademliaServer.RoutingTable.MarkDead(contact)
     }
 
     //Not sure if we should close the connection

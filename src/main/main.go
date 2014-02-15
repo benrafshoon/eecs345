@@ -5,20 +5,18 @@ import (
     "fmt"
     "log"
     "math/rand"
-    "net"
+    //"net"
     //"net/http"
     //"net/rpc"
     "time"
     "os"
     "bufio"
     "strings"
-    //"strconv"
 )
 
 import (
     "kademlia"
 )
-
 
 func main() {
     // By default, Go seeds its RNG with 1. This would cause every program to
@@ -53,7 +51,11 @@ func main() {
         log.Fatal("Error starting kademlia server: ", error)
     }
 
-    kademliaServer.SendPing(firstPeerStr)
+    firstPeer, error := kademlia.NewContactFromAddressString(firstPeerStr)
+    if error != nil {
+        log.Fatal("Error parsing first contact ", error)
+    }
+    kademliaServer.SendPing(firstPeer)
 
     in := bufio.NewReader(os.Stdin)
     quit := false
@@ -118,8 +120,8 @@ func main() {
         case "ping":
             if len(command) < 2 {
                 log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
-            } else if _, _, error := net.SplitHostPort(command[1]); error == nil {
-                error := kademliaServer.SendPing(command[1])
+            } else if firstContact, error := kademlia.NewContactFromAddressString(command[1]); error == nil {
+                error := kademliaServer.SendPing(firstContact)
                 if error != nil {
                     log.Println(error)
                 }
@@ -133,7 +135,11 @@ func main() {
                         if isSelf {
                             log.Printf("Self contact")
                         }
-                        kademliaServer.SendPing(contact.GetAddress())
+                        error = kademliaServer.SendPing(contact)
+                        if error != nil {
+                            log.Printf("Error: ", error)
+                            fmt.Printf("ERR\n")
+                        }
                     }
                 }
 

@@ -14,14 +14,15 @@ import (
 	"container/list"
 )
 
-
 type kBucket struct {
 	list *list.List
+	pending *Contact
 }
 
 func newKBucket() *kBucket {
 	bucket := new(kBucket)
 	bucket.list = list.New()
+	bucket.pending = nil
 	return bucket
 }
 
@@ -55,6 +56,15 @@ func (b *kBucket) AddToTail(contact *Contact) bool {
 	return false
 }
 
+func (b *kBucket) GetHead() *Contact {
+	frontElement := b.list.Front()
+	if frontElement == nil {
+		return nil
+	} else {
+		return frontElement.Value.(*Contact)
+	}
+}
+
 func (b *kBucket) FindContactByNodeID(lookupID ID) (bool, *Contact) {
 	element := b.list.Front()
 	for element != nil {
@@ -67,5 +77,16 @@ func (b *kBucket) FindContactByNodeID(lookupID ID) (bool, *Contact) {
 
 func (b *kBucket) IsFull() bool {
 	return b.list.Len() >= const_k
+}
+
+func (b *kBucket) Delete(contact *Contact) bool {
+	element := b.list.Front()
+	for element != nil {
+		if element.Value.(*Contact).NodeID.Equals(contact.NodeID) {
+			b.list.Remove(element)
+			return true
+		}
+	}
+	return false
 }
 

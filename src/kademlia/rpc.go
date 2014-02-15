@@ -7,6 +7,7 @@ import (
     "net"
     "log"
     "fmt"
+    "strconv"
 )
 
 
@@ -35,6 +36,26 @@ func NewContact(nodeID ID, host net.IP, port uint16) *Contact {
     contact.Host = host
     contact.Port = port
     return contact
+}
+
+func NewContactFromAddressString(addressString string) (*Contact, error) {
+    contact := new(Contact)
+    host, port, error := net.SplitHostPort(addressString)
+    if error != nil {
+        return nil, error
+    }
+    portuint64, error := strconv.ParseInt(port, 10, 16)
+    if error != nil {
+        return nil, error
+    }
+    contact.Port = uint16(portuint64)
+    if host == "localhost" {
+        contact.Host = net.ParseIP("127.0.0.1")
+    } else {
+        contact.Host = net.ParseIP(host)
+    }
+    return contact, nil
+
 }
 
 // PING

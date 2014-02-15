@@ -31,10 +31,16 @@ func NewKBucketTable() *KBucketTable {
 }
 
 //Thread-safe
-func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) {
+//Returns needToPing, contactToPing
+//needToPing will be true if the contact being marked alive is new in a k bucket
+//and the k bucket is full.  The contact returned is the least recently seen contact
+//Need to send a ping request to contactToPing if needToPing is true
+func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) (bool, *Contact) {
 	log.Printf("Sending MarkAlive request")
-	request := markAliveRequest{contact}
+	request := markAliveRequest{contact, make(chan markAliveResult)}
 	kBucketTable.requests <- request
+	result := <- request.result
+	return result.toPing != nil, result.toPing
 }
 
 //Thread-safe
@@ -92,25 +98,45 @@ func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 
 type markAliveRequest struct {
 	contact *Contact
+	result chan markAliveResult
 }
 
 func (r markAliveRequest) RequestType() string {
 	return "MarkAlive"
 }
 
-//No response
+type markAliveResult struct {
+	toPing *Contact
+}
 
 func (kBucketTable *KBucketTable) markAliveInternal(request markAliveRequest) {
+	var toPing *Contact = nil
 	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
 	if distanceBucket != -1 {
+		kBucket := kBucketTable.kBuckets[distanceBucket]
 		log.Printf("Marking node in bucket %v as alive", distanceBucket)
-		if !kBucketTable.kBuckets[distanceBucket].AddOrMoveToTail(request.contact) {
-			kBucketTable.kBuckets[distanceBucket].DeleteFromHead(request.contact)
-			kBucketTable.kBuckets[distanceBucket].AddToTail(request.contact)
+		if kBucket.AddOrMoveToTail(request.contact) {
+			//Could add or already in table
+			if kBucket.pending != nil && kBucket.GetHead().Equals(request.contact) {
+				log.Printf("Head node ", request.contact.NodeID.AsString(), " responded, ignoring other new node")
+				kBucket.pending = nil
+			}
+		} else {
+			//Could not add, so we'll put the node as pending in the kbucket and ping the head
+			log.Printf("Tried to add node, but k bucket was full")
+
+			//If pending is not nil, then we already have a pending node and pinged the head
+			//Because we want the least recently seen nodes, we will have to ignore the request's node
+			if kBucket.pending == nil {
+				kBucket.pending = request.contact
+				toPing = kBucket.GetHead()
+				log.Printf("Need to ping node ", toPing.NodeID.AsString())
+			}
 		}
 	} else {
 		log.Printf("Marking self as alive")
 	}
+	request.result <- markAliveResult{toPing}
 }
 
 
@@ -126,7 +152,14 @@ func (r markDeadRequest) RequestType() string {
 //No response
 
 func (kBucketTable *KBucketTable) markDeadInternal(request markDeadRequest) {
-	log.Printf("Mark dead not yet implemented")
+	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
+	kBucket := kBucketTable.kBuckets[distanceBucket]
+	kBucket.Delete(request.contact)
+	if kBucket.pending != nil {
+		log.Printf("Now there is space for node ", kBucket.pending.NodeID.AsString())
+		kBucket.AddToTail(kBucket.pending)
+		kBucket.pending = nil
+	}
 }
 
 
