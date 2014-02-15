@@ -58,12 +58,16 @@ func main() {
     kademliaServer.SendPing(firstPeer)
 
     in := bufio.NewReader(os.Stdin)
+
     quit := false
     for !quit {
-        
+
         input, err := in.ReadString('\n')
+        log.Printf(" command: ", input)
         if err != nil {
-                // handle error
+            //Still do the last command, but then quit
+            quit = true
+            
         }
         input = strings.Replace(input, "\n", "", -1) //use this as our end of input so remove it here
         command := strings.Split(input," ")
@@ -74,40 +78,47 @@ func main() {
         case "local_find_value":
             if len(command) < 2 {
                 log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
-            } else if id, error := kademlia.FromString(command[1]); error != nil {
-                log.Printf("Error in command \"local_find_value\": %v", error)
-            } else {
-                log.Printf("Finding local value for key %v", id.AsString())
-                value := kademliaServer.Data.RetrieveValue(id)
-                if value != nil {
-                    fmt.Printf("%v\n", string(value))
-                } else {
-                    fmt.Printf("ERR\n")
-                }
-                
+                continue
             }
+            id, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"local_find_value\": %v", error)
+                continue
+            }
+
+            log.Printf("Finding local value for key %v", id.AsString())
+            value := kademliaServer.Data.RetrieveValue(id)
+            if value == nil {
+                fmt.Printf("ERR\n")
+                continue
+            }
+            fmt.Printf("%v\n", string(value))
+
         case "get_contact":
             if len(command) < 2 {
                 log.Printf("Error in command \"get_contact\": must enter ID, command must be of the form \"get_contact ID\"")
-            } else {
-                id, error := kademlia.FromString(command[1])
-                if error != nil {
-                    log.Printf("Error in command \"get_contact\": %v", error)
-                } else {
-                    hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
-                    if !hasContact {
-                        fmt.Printf("ERR\n")
-                    } else {
-                        if isSelf {
-                            log.Printf("Self Contact")
-                            fmt.Printf("ERR\n")
-                        } else {
-                            fmt.Printf("%v %v\n", contact.Host, contact.Port)
-                        }
-                    }
-                }
-                
+                continue
+            } 
+            id, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"get_contact\": %v", error)
+                continue
+            } 
+
+            hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
+            if !hasContact {
+                fmt.Printf("ERR\n")
+                continue
             }
+            if isSelf {
+                log.Printf("Self Contact")
+                fmt.Printf("ERR\n")
+                continue
+            }    
+            fmt.Printf("%v %v\n", contact.Host, contact.Port)
+            
+        
+                
 
             
         case "iterativeStore":
@@ -120,29 +131,35 @@ func main() {
         case "ping":
             if len(command) < 2 {
                 log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
-            } else if firstContact, error := kademlia.NewContactFromAddressString(command[1]); error == nil {
+                continue
+            }
+            if firstContact, error := kademlia.NewContactFromAddressString(command[1]); error == nil {
+                //ping host:port
                 error := kademliaServer.SendPing(firstContact)
                 if error != nil {
                     log.Println(error)
                 }
             } else {
+                //ping nodeID
                 id, error := kademlia.FromString(command[1])
                 if error != nil {
                     log.Printf("Error in command \"ping\": nodeID: %v", error)
-                } else {
-                    hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
-                    if hasContact {
-                        if isSelf {
-                            log.Printf("Self contact")
-                        }
-                        error = kademliaServer.SendPing(contact)
-                        if error != nil {
-                            log.Printf("Error: ", error)
-                            fmt.Printf("ERR\n")
-                        }
-                    }
+                    continue
                 }
 
+                hasContact, isSelf, contact := kademliaServer.RoutingTable.LookupContactByNodeID(id)
+                if !hasContact {
+                    log.Printf("Contact not found")
+                    fmt.Printf("ERR\n")
+                }
+                if isSelf {
+                    log.Printf("Self contact")
+                }
+                error = kademliaServer.SendPing(contact)
+                if error != nil {
+                    log.Printf("Error: ", error)
+                    fmt.Printf("ERR\n")
+                }
             }
         case "store":
             if len(command) < 4 {
@@ -263,10 +280,6 @@ func main() {
 
                 fmt.Printf("%v\n", foundIDs)
             }
-
-        case "quit": 
-            quit = true
-
         default:
             log.Printf("Unrecognized command: %s", command[0])
         }
