@@ -32,17 +32,17 @@ func main() {
     listenStr := args[0]
     firstPeerStr := args[1]
 
-    var kademliaServer *kademlia.KademliaServer
+    var kademliaServer *kademlia.Kademlia
 
     if len(args) >= 3 {
         testNodeID, error := kademlia.FromString(args[2])
         if error != nil {
             log.Fatal("Error parsing test node ID: ", error)
         }
-        kademliaServer = kademlia.NewTestKademliaServer(testNodeID)
+        kademliaServer = kademlia.NewTestKademlia(testNodeID)
 
     } else {
-        kademliaServer = kademlia.NewKademliaServer()
+        kademliaServer = kademlia.NewKademlia()
     }
     
     error := kademliaServer.StartKademliaServer(listenStr)
@@ -169,7 +169,7 @@ func main() {
                 if isSelf {
                     log.Printf("Storing in self")
                 }
-                kademliaServer.SendStore(contact.GetAddress(), key, value)
+                kademliaServer.SendStore(contact, key, value)
                 fmt.Printf("\n")
             } else {
                 fmt.Printf("ERR\n")
@@ -197,7 +197,7 @@ func main() {
                 fmt.Printf("ERR\n")
                 continue
             }
-            error, foundContacts := kademliaServer.SendFindNode(contact.GetAddress(), nodeToFind)
+            error, foundContacts := kademliaServer.SendFindNode(contact, nodeToFind)
             if error != nil {
                 log.Printf("%v", error)
                 fmt.Printf("ERR\n")
@@ -240,7 +240,7 @@ func main() {
                 fmt.Printf("ERR\n")
                 continue
             }
-            error, foundValue, foundContacts := kademliaServer.SendFindValue(contact.GetAddress(), key)
+            error, foundValue, foundContacts := kademliaServer.SendFindValue(contact, key)
             if error != nil {
                 log.Printf("%v", error)
                 fmt.Printf("ERR\n")

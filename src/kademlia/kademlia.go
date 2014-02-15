@@ -16,37 +16,28 @@ const const_alpha = 3
 const const_B = 160
 const const_k = 20
 
-//Kademlia contains methods that are remotely accessable via rpc
-// Core Kademlia type. You can put whatever state you want in this.
 type Kademlia struct {
-    //selfContact *Contact
-    //kBuckets []*Bucket
     RoutingTable *KBucketTable
     Data *KeyValueStore
 }
 
-//KademliaServer contains methods that are accessible by the client program
-type KademliaServer struct {
-	Kademlia
-}
-
-func NewKademliaServer() *KademliaServer {
-	kademliaServer := new(KademliaServer)
-    kademliaServer.RoutingTable = NewKBucketTable()
-    kademliaServer.RoutingTable.SelfContact.NodeID = NewRandomID()
+func NewKademlia() *Kademlia {
+	kademlia := new(Kademlia)
+    kademlia.RoutingTable = NewKBucketTable()
+    kademlia.RoutingTable.SelfContact.NodeID = NewRandomID()
     
-    kademliaServer.Data = NewKeyValueStore()
-	return kademliaServer
+    kademlia.Data = NewKeyValueStore()
+	return kademlia
 }
 
-func NewTestKademliaServer(nodeID ID) *KademliaServer {
-    kademliaServer := NewKademliaServer()
-    kademliaServer.RoutingTable.SelfContact.NodeID = nodeID
-    return kademliaServer
+func NewTestKademlia(nodeID ID) *Kademlia {
+    kademlia := NewKademlia()
+    kademlia.RoutingTable.SelfContact.NodeID = nodeID
+    return kademlia
 }
 
-func (kademliaServer *KademliaServer) StartKademliaServer(address string) error {
-	error := rpc.Register(&kademliaServer.Kademlia)
+func (kademlia *Kademlia) StartKademliaServer(address string) error {
+	error := rpc.RegisterName("Kademlia", NewKademliaRPCWrapper(kademlia))
     if error != nil {
         return error
     }
@@ -66,13 +57,13 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     if hostIP == nil {
     	return errors.New("Invalid host")
     }
-	kademliaServer.RoutingTable.SelfContact.Host = hostIP
+	kademlia.RoutingTable.SelfContact.Host = hostIP
 
     portInt, error := strconv.ParseUint(port, 10, 16)
     if error != nil {
     	return error
     }
-    kademliaServer.RoutingTable.SelfContact.Port = uint16(portInt)
+    kademlia.RoutingTable.SelfContact.Port = uint16(portInt)
 
     
 
@@ -80,47 +71,47 @@ func (kademliaServer *KademliaServer) StartKademliaServer(address string) error 
     go http.Serve(listener, nil)
 
     log.Printf("Starting kademlia server listening on %v:%v\n", hostIP, portInt)
-    log.Printf("Self NodeID: %v", kademliaServer.RoutingTable.SelfContact.NodeID.AsString())
+    log.Printf("Self NodeID: %v", kademlia.RoutingTable.SelfContact.NodeID.AsString())
     return nil
 }
 
 
-func (kademliaServer *KademliaServer) GetNodeID() ID {
-	return kademliaServer.RoutingTable.SelfContact.NodeID
+func (kademlia *Kademlia) GetNodeID() ID {
+	return kademlia.RoutingTable.SelfContact.NodeID
 }
 
-func (kademliaServer *KademliaServer) markAliveAndPossiblyPing(contact *Contact) {
-    needToPing, contactToPing := kademliaServer.RoutingTable.MarkAlive(contact)
+func (kademlia *Kademlia) markAliveAndPossiblyPing(contact *Contact) {
+    needToPing, contactToPing := kademlia.RoutingTable.MarkAlive(contact)
     if needToPing {
-        go kademliaServer.SendPing(contactToPing)
+        go kademlia.SendPing(contactToPing)
     }
 }
 
 //The contact to send a ping to is not required to have a NodeID
-func (kademliaServer *KademliaServer) SendPing(contact *Contact) error {
+func (kademlia *Kademlia) SendPing(contact *Contact) error {
 	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
     if err != nil {
         log.Printf("Connection error, marking node dead")
-        kademliaServer.RoutingTable.MarkDead(contact)
+        kademlia.RoutingTable.MarkDead(contact)
         return err
     }
 
     log.Printf("Sending ping to %v\n", contact.GetAddress())
 
     ping := new(Ping)
-    ping.Sender = *kademliaServer.RoutingTable.SelfContact
+    ping.Sender = *kademlia.RoutingTable.SelfContact
     ping.MsgID = NewRandomID()
     var pong Pong
     err = client.Call("Kademlia.Ping", ping, &pong)
     if err != nil {
         log.Printf("Error in remote node response, marking node dead")
-        kademliaServer.RoutingTable.MarkDead(contact)
+        kademlia.RoutingTable.MarkDead(contact)
         return err
     }
     if ping.MsgID.Equals(pong.MsgID) {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
     	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
-        kademliaServer.RoutingTable.MarkAlive(&pong.Sender)
+        kademlia.RoutingTable.MarkAlive(&pong.Sender)
         
     } else {
     	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
@@ -128,8 +119,8 @@ func (kademliaServer *KademliaServer) SendPing(contact *Contact) error {
 		log.Printf("Incorrect MsgID\n");
 		log.Printf("  Ping Message ID: %v\n", ping.MsgID.AsString())
 		log.Printf("  Pong Message ID: %v\n", pong.MsgID.AsString())
-        
-        kademliaServer.RoutingTable.MarkDead(contact)
+
+        kademlia.RoutingTable.MarkDead(contact)
     }
 
     //Not sure if we should close the connection
@@ -137,14 +128,16 @@ func (kademliaServer *KademliaServer) SendPing(contact *Contact) error {
     return nil
 }
 
-func (kademliaServer *KademliaServer) SendStore(address string, key ID, value []byte) error {
-    client, err := rpc.DialHTTP("tcp", address)
+func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) error {
+    client, err := rpc.DialHTTP("tcp", contact.GetAddress())
     if err != nil {
+        log.Printf("Connection error, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err
     }
-    log.Printf("Sending store to %v\n", address)
+    log.Printf("Sending store to %v\n", contact.GetAddress())
     storeRequest := new(StoreRequest)
-    storeRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    storeRequest.Sender = *kademlia.RoutingTable.SelfContact
     storeRequest.MsgID = NewRandomID()
     storeRequest.Key = key
     storeRequest.Value = value
@@ -152,46 +145,52 @@ func (kademliaServer *KademliaServer) SendStore(address string, key ID, value []
     storeResult := new(StoreResult)
     err = client.Call("Kademlia.Store", storeRequest, storeResult)
     if err != nil {
+        log.Printf("Error in remote node response, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err
     }
 
     if storeRequest.MsgID.Equals(storeResult.MsgID) {
         log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
         log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
-        kademliaServer.RoutingTable.MarkAlive(&storeRequest.Sender)
+        kademlia.markAliveAndPossiblyPing(contact)
     } else {
         log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
         log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
         log.Printf("Incorrect MsgID\n");
         log.Printf("      Request Message ID: %v\n", storeRequest.MsgID.AsString())
         log.Printf("       Result Message ID: %v\n", storeResult.MsgID.AsString())
-        //Probably should mark dead
+        kademlia.RoutingTable.MarkDead(contact)
     }
     client.Close()
     return nil
 }
 
-func (kademliaServer *KademliaServer) SendFindNode(address string, nodeToFind ID) (error, []*Contact) {
-    client, err := rpc.DialHTTP("tcp", address)
+func (kademlia *Kademlia) SendFindNode(contact *Contact, nodeToFind ID) (error, []*Contact) {
+    client, err := rpc.DialHTTP("tcp", contact.GetAddress())
     if err != nil {
+        log.Printf("Connection error, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err, nil
     }
-    log.Printf("Sending find node to %v\n", address)
+    log.Printf("Sending find node to %v\n", contact.GetAddress())
     findNodeRequest := new(FindNodeRequest)
-    findNodeRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    findNodeRequest.Sender = *kademlia.RoutingTable.SelfContact
     findNodeRequest.MsgID = NewRandomID()
     findNodeRequest.NodeID = nodeToFind
 
     findNodeResult := new(FindNodeResult)
     err = client.Call("Kademlia.FindNode", findNodeRequest, findNodeResult)
     if err != nil {
+        log.Printf("Error in remote node response, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err, nil
     }
 
     log.Printf("Received response\n")
 
     if findNodeRequest.MsgID.Equals(findNodeResult.MsgID) {
-        kademliaServer.RoutingTable.MarkAlive(&findNodeRequest.Sender)
+        kademlia.markAliveAndPossiblyPing(contact)
         contacts := make([]*Contact, len(findNodeResult.Nodes), len(findNodeResult.Nodes))
 
         for i := 0; i < len(findNodeResult.Nodes); i++ {
@@ -203,33 +202,38 @@ func (kademliaServer *KademliaServer) SendFindNode(address string, nodeToFind ID
         log.Printf("Incorrect MsgID\n");
         log.Printf("      Request Message ID: %v\n", findNodeRequest.MsgID.AsString())
         log.Printf("       Result Message ID: %v\n", findNodeResult.MsgID.AsString())
+        kademlia.RoutingTable.MarkDead(contact)
         return errors.New("Incorrect MsgID"), nil
     }
     client.Close()
     return nil, nil
 }
 
-func (kademliaServer *KademliaServer) SendFindValue(address string, key ID) (error, []byte, []*Contact) {
-    client, err := rpc.DialHTTP("tcp", address)
+func (kademlia *Kademlia) SendFindValue(contact *Contact, key ID) (error, []byte, []*Contact) {
+    client, err := rpc.DialHTTP("tcp", contact.GetAddress())
     if err != nil {
+        log.Printf("Connection error, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err, nil, nil
     }
-    log.Printf("Sending find value to %v\n", address)
+    log.Printf("Sending find value to %v\n", contact.GetAddress())
     log.Printf("         Key to find: %v\n", key.AsString())
     findValueRequest := new(FindValueRequest)
-    findValueRequest.Sender = *kademliaServer.RoutingTable.SelfContact
+    findValueRequest.Sender = *kademlia.RoutingTable.SelfContact
     findValueRequest.MsgID = NewRandomID()
     findValueRequest.Key = key
 
     findValueResult := new(FindValueResult)
     err = client.Call("Kademlia.FindValue", findValueRequest, findValueResult)
     if err != nil {
+        log.Printf("Error in remote node response, marking node dead")
+        kademlia.RoutingTable.MarkDead(contact)
         return err, nil, nil
     }
 
     log.Printf("Received response\n")
     if findValueRequest.MsgID.Equals(findValueResult.MsgID) {
-        kademliaServer.RoutingTable.MarkAlive(&findValueRequest.Sender)
+        kademlia.markAliveAndPossiblyPing(contact)
         if findValueResult.Value != nil {
             return nil, findValueResult.Value, nil
         } else {
@@ -244,6 +248,7 @@ func (kademliaServer *KademliaServer) SendFindValue(address string, key ID) (err
         log.Printf("Incorrect MsgID\n");
         log.Printf("      Request Message ID: %v\n", findValueRequest.MsgID.AsString())
         log.Printf("       Result Message ID: %v\n", findValueResult.MsgID.AsString())
+        kademlia.RoutingTable.MarkDead(contact)
         return errors.New("Incorrect MsgID"), nil, nil
     }
     client.Close()

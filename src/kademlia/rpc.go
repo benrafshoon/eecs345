@@ -80,7 +80,7 @@ func (k *Kademlia) Ping(ping Ping, pong *Pong) error {
     pong.MsgID = CopyID(ping.MsgID)
     pong.Sender = *k.RoutingTable.SelfContact
 
-    k.RoutingTable.MarkAlive(&ping.Sender)
+    k.markAliveAndPossiblyPing(&ping.Sender)
     return nil
 }
 
@@ -111,7 +111,7 @@ func (k *Kademlia) Store(req StoreRequest, res *StoreResult) error {
     res.MsgID = req.MsgID
     res.Err = nil
 
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
     return nil
 }
 
@@ -160,7 +160,7 @@ func (k *Kademlia) FindNode(req FindNodeRequest, res *FindNodeResult) error {
 
     res.Err = nil
     
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
 
     return nil
 }
@@ -198,7 +198,7 @@ func (k *Kademlia) FindValue(req FindValueRequest, res *FindValueResult) error {
         }
     }
 
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
 
     return nil
 }
