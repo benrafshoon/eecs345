@@ -23,21 +23,11 @@ type Kademlia struct {
     Data *KeyValueStore
 }
 
-//KademliaServer contains methods that are accessible by the client program
-type KademliaServer struct {
-	Kademlia
-}
-
 //
 type IterativeContact struct {
     contact *Contact
     checked bool
 }
-
-func NewKademliaServer() *KademliaServer {
-	kademliaServer := new(KademliaServer)
-    kademliaServer.RoutingTable = NewKBucketTable()
-    kademliaServer.RoutingTable.SelfContact.NodeID = NewRandomID()
 
 func NewKademlia() *Kademlia {
 	kademlia := new(Kademlia)
@@ -183,11 +173,11 @@ func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) erro
     return nil
 }
 
-func (kademliaServer *KademliaServer) SendIterativeFindNode(nodeToFind ID) (error, []*Contact) {
+func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contact) {
     //This function should return a list of k closest contacts to the specified node
     shortList := make([]*IterativeContact, 0,const_k) //slice - array with 0 things now and a capacity of const_k
     //have to do at least one call to kick it off
-    foundContacts := kademliaServer.RoutingTable.FindKClosestNodes(const_alpha, nodeToFind, kademliaServer.RoutingTable.SelfContact.NodeID)
+    foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, nodeToFind, kademlia.RoutingTable.SelfContact.NodeID)
     
     var closestPosition, farthestPosition int = 0, 0
 
@@ -230,7 +220,7 @@ func (kademliaServer *KademliaServer) SendIterativeFindNode(nodeToFind ID) (erro
                     }
                     //worrying about the address later
                     go func() {
-                        error, result := kademliaServer.SendFindNode(shortList[j].contact, shortList[j].contact.NodeID) //send out the separate threads
+                        error, result := kademlia.SendFindNode(shortList[j].contact, shortList[j].contact.NodeID) //send out the separate threads
                         if error == nil {
                             tempChannel <- result
                         }
