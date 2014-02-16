@@ -65,7 +65,6 @@ func main() {
         }
         input = strings.Replace(input, "\n", "", -1) //use this as our end of input so remove it here
         command := strings.Split(input," ")
-
         switch command[0] {
         case "whoami":
             fmt.Printf("%v\n Node ID: %v\n", kademliaServer.GetNodeID().AsString(), kademliaServer.GetNodeID())
@@ -110,8 +109,39 @@ func main() {
             
         case "iterativeStore":
             log.Printf("Not yet implemented")
+ 
         case "iterativeFindNode":
-            log.Printf("Not yet implemented")
+            if len(command) < 2 {
+                log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID\"")
+                continue
+            }
+            nodeID, error := kademlia.FromString(command[1])
+            if error != nil {
+                log.Printf("Error in command \"find_node\": nodeID: %v", error)
+                continue
+            }
+
+            log.Printf("Finding nodes close to %v", nodeID.AsString())
+
+            error, foundContacts := kademliaServer.SendIterativeFindNode(nodeID)
+            if error != nil {
+                log.Printf("%v", error)
+                fmt.Printf("ERR\n")
+                continue
+            }
+
+            foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+
+            log.Printf("NodeIDs found: ")
+
+            for i := 0; i < len(foundContacts); i++ {
+                foundIDs[i] = foundContacts[i].NodeID    
+
+                log.Printf("%v", foundIDs[i].AsString())
+            }
+
+            fmt.Printf("%v\n", foundIDs)
+
         case "iterativeFindValue":
             log.Printf("Not yet implemented")
 
