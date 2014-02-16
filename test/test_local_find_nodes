@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#store instance
+./testkademlia localhost:4000 localhost:4000 1000000000000000000000000000000000000000 test_local_find_nodes.test.in test_local_find_nodes.test.out test_local_find_nodes.test.log &
+
+#retrieve instance
+./testkademlia localhost:4001 localhost:4000 5000000000000000000000000000000000000000 /dev/null /dev/null /dev/null &
+
+wait
+
+diff test_local_find_nodes.test.out test_local_find_nodes.test.out.expected >&1

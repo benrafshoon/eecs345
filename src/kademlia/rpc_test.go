@@ -11,3 +11,17 @@ func Test_Contact_GetAddress_1(t *testing.T) {
 			t.Fail()
 	}
 }
+
+func Test_Contact_NewContactFromAddressString(t *testing.T) {
+	contact, error := NewContactFromAddressString("localhost:1234")
+	if error != nil {
+		t.Error(error)
+	}
+	if !contact.Host.IsLoopback() {
+		t.Fail()	
+	}
+	if contact.Port != uint16(1234) {
+		t.Fail()
+	}
+
+}

@@ -7,6 +7,7 @@ import (
     "net"
     "log"
     "fmt"
+    "strconv"
 )
 
 
@@ -37,6 +38,26 @@ func NewContact(nodeID ID, host net.IP, port uint16) *Contact {
     return contact
 }
 
+func NewContactFromAddressString(addressString string) (*Contact, error) {
+    contact := new(Contact)
+    host, port, error := net.SplitHostPort(addressString)
+    if error != nil {
+        return nil, error
+    }
+    portuint64, error := strconv.ParseInt(port, 10, 16)
+    if error != nil {
+        return nil, error
+    }
+    contact.Port = uint16(portuint64)
+    if host == "localhost" {
+        contact.Host = net.ParseIP("127.0.0.1")
+    } else {
+        contact.Host = net.ParseIP(host)
+    }
+    return contact, nil
+
+}
+
 // PING
 type Ping struct {
     Sender Contact
@@ -59,7 +80,7 @@ func (k *Kademlia) Ping(ping Ping, pong *Pong) error {
     pong.MsgID = CopyID(ping.MsgID)
     pong.Sender = *k.RoutingTable.SelfContact
 
-    k.RoutingTable.MarkAlive(&ping.Sender)
+    k.markAliveAndPossiblyPing(&ping.Sender)
     return nil
 }
 
@@ -90,7 +111,7 @@ func (k *Kademlia) Store(req StoreRequest, res *StoreResult) error {
     res.MsgID = req.MsgID
     res.Err = nil
 
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
     return nil
 }
 
@@ -139,7 +160,7 @@ func (k *Kademlia) FindNode(req FindNodeRequest, res *FindNodeResult) error {
 
     res.Err = nil
     
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
 
     return nil
 }
@@ -177,7 +198,7 @@ func (k *Kademlia) FindValue(req FindValueRequest, res *FindValueResult) error {
         }
     }
 
-    k.RoutingTable.MarkAlive(&req.Sender)
+    k.markAliveAndPossiblyPing(&req.Sender)
 
     return nil
 }
