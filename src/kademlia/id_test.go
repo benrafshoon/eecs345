@@ -1,7 +1,9 @@
 package kademlia
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 	//"encoding/hex"
 )
 
@@ -37,9 +39,9 @@ func Test_DistanceBucket_1(t *testing.T) {
 	if actualResult != expectedResult {
 		t.Fatal("Expected %v, got %v", expectedResult, actualResult)
 	}
- }
+}
 
- func Test_DistanceBucket_2(t *testing.T) {
+func Test_DistanceBucket_2(t *testing.T) {
 	id1 := "0000000000000000000000000000000000000000"
 	id2 := "0000000000000000000000000000000000000001"
 	expectedResult := 0
@@ -47,9 +49,9 @@ func Test_DistanceBucket_1(t *testing.T) {
 	if actualResult != expectedResult {
 		t.Fatal("Expected %v, got %v", expectedResult, actualResult)
 	}
- }
+}
 
- func Test_DistanceBucket_3(t *testing.T) {
+func Test_DistanceBucket_3(t *testing.T) {
 	id1 := "0000000000000000000000000000000000000000"
 	id2 := "0000000000000000000000000000000000000005"
 	expectedResult := 2
@@ -57,15 +59,25 @@ func Test_DistanceBucket_1(t *testing.T) {
 	if actualResult != expectedResult {
 		t.Fatal("Expected %v, got %v", expectedResult, actualResult)
 	}
- }
+}
 
- func Test_DistanceBucket_4(t *testing.T) {
- 	id := "123456789ABCDEF0123456789ABCDEF012345678"
- 	expectedResult := -1
- 	actualResult := test_DistanceBucket(t, id, id)
- 	if actualResult != expectedResult {
+func Test_DistanceBucket_4(t *testing.T) {
+	id := "123456789ABCDEF0123456789ABCDEF012345678"
+	expectedResult := -1
+	actualResult := test_DistanceBucket(t, id, id)
+	if actualResult != expectedResult {
 		t.Fatal("Expected %v, got %v", expectedResult, actualResult)
 	}
- }
+}
 
-
+func Test_RandomIDInBucket(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	id1Str := "0000000000000000000000000000000000000000"
+	id1, _ := FromString(id1Str)
+	t.Log(id1.RandomIDInBucket(0).AsString())
+	t.Log(id1.RandomIDInBucket(159).AsString())
+	id2Str := "8000000000000000000000000000000000000000"
+	id2, _ := FromString(id2Str)
+	t.Log(id2.RandomIDInBucket(0).AsString())
+	t.Log(id2.RandomIDInBucket(159).AsString())
+}

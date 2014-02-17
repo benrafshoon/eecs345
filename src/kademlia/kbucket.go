@@ -93,3 +93,7 @@ func (b *kBucket) Delete(contact *Contact) bool {
 	}
 	return false
 }
+
+func (b *kBucket) IsEmpty() bool {
+	return b.list.Len() == 0
+}

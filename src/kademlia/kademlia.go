@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/rpc"
+	"os"
 	"strconv"
 	"time"
 )
@@ -44,6 +45,56 @@ func NewTestKademlia(nodeID ID) *Kademlia {
 	return kademlia
 }
 
+func (kademlia *Kademlia) InitializeRoutingTable(firstNode *Contact) error {
+	log.Printf("Initializing routing table")
+	log.Printf("Pinging first contact to get its NodeID")
+	firstNode, error := kademlia.SendPing(firstNode)
+	if error != nil {
+		return error
+	}
+
+	log.Printf("Performing an iterative find node on self")
+	error, newContacts := kademlia.SendIterativeFindNode(kademlia.RoutingTable.SelfContact.NodeID)
+
+	if error != nil {
+		return error
+	}
+	//Not sure if we should add these contacts
+	for i := 0; i < len(newContacts); i++ {
+		kademlia.markAliveAndPossiblyPing(newContacts[i])
+	}
+
+	closestNeighborBucketFound := false
+
+	//Refresh all buckets that aren't the bucket of the closest neighbor
+	//aka all buckets except the first occupied
+	log.Printf("Refreshing all buckets that arent the closest neighbor")
+	for i := 0; i < const_B; i++ {
+		if closestNeighborBucketFound {
+			kademlia.refreshBucket(i)
+		} else {
+			if !kademlia.RoutingTable.kBuckets[i].IsEmpty() {
+				closestNeighborBucketFound = true
+				log.Printf("First occupied bucket %v, will refresh the rest", i)
+			}
+		}
+	}
+	return nil
+}
+
+func (kademlia *Kademlia) refreshBucket(bucket int) {
+	randomID := kademlia.RoutingTable.SelfContact.NodeID.RandomIDInBucket(bucket)
+	log.Printf("Refreshing bucket %v using random ID in bucket: %v", bucket, randomID.AsString())
+	//Not sure if we should mark the results as alive or do nothing with the results
+	error, newNodes := kademlia.SendIterativeFindNode(randomID)
+	if error != nil {
+		for i := 0; i < len(newNodes); i++ {
+			kademlia.markAliveAndPossiblyPing(newNodes[i])
+		}
+	}
+
+}
+
 func (kademlia *Kademlia) StartKademliaServer(address string) error {
 	error := rpc.RegisterName("Kademlia", NewKademliaRPCWrapper(kademlia))
 	if error != nil {
@@ -55,17 +106,27 @@ func (kademlia *Kademlia) StartKademliaServer(address string) error {
 	if error != nil {
 		return error
 	}
-
-	host, port, error := net.SplitHostPort(listener.Addr().String())
+	hostname, error := os.Hostname()
 	if error != nil {
 		return error
 	}
 
-	hostIP := net.ParseIP(host)
-	if hostIP == nil {
-		return errors.New("Invalid host")
+	ipAddrStrings, error := net.LookupHost(hostname)
+	var host net.IP
+	for i := 0; i < len(ipAddrStrings); i++ {
+		host = net.ParseIP(ipAddrStrings[i])
+		if host.To4() != nil {
+			break
+		}
 	}
-	kademlia.RoutingTable.SelfContact.Host = hostIP
+	log.Printf("ip address: %v", host)
+
+	_, port, error := net.SplitHostPort(listener.Addr().String())
+	if error != nil {
+		return error
+	}
+
+	kademlia.RoutingTable.SelfContact.Host = host
 
 	portInt, error := strconv.ParseUint(port, 10, 16)
 	if error != nil {
@@ -76,7 +137,7 @@ func (kademlia *Kademlia) StartKademliaServer(address string) error {
 	// Serve forever.
 	go http.Serve(listener, nil)
 
-	log.Printf("Starting kademlia server listening on %v:%v\n", hostIP, portInt)
+	log.Printf("Starting kademlia server listening on %v:%v\n", host, portInt)
 	log.Printf("Self NodeID: %v", kademlia.RoutingTable.SelfContact.NodeID.AsString())
 	return nil
 }
@@ -93,12 +154,13 @@ func (kademlia *Kademlia) markAliveAndPossiblyPing(contact *Contact) {
 }
 
 //The contact to send a ping to is not required to have a NodeID
-func (kademlia *Kademlia) SendPing(contact *Contact) error {
+//The NodeID is returned if the contact responded
+func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
 	if err != nil {
 		log.Printf("Connection error, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
-		return err
+		return nil, err
 	}
 
 	log.Printf("Sending ping to %v\n", contact.GetAddress())
@@ -111,7 +173,7 @@ func (kademlia *Kademlia) SendPing(contact *Contact) error {
 	if err != nil {
 		log.Printf("Error in remote node response, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
-		return err
+		return nil, err
 	}
 	if ping.MsgID.Equals(pong.MsgID) {
 		log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
@@ -130,7 +192,7 @@ func (kademlia *Kademlia) SendPing(contact *Contact) error {
 
 	//Not sure if we should close the connection
 	client.Close()
-	return nil
+	return &pong.Sender, nil
 }
 
 func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) error {
@@ -206,12 +268,16 @@ func shortListContains(shortList []*IterativeContact, contact *Contact) bool {
 }
 
 func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contact) {
+	log.Printf("Sending iterative find node for node %v", nodeToFind.AsString())
 	//This function should return a list of k closest contacts to the specified node
 	shortList := make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
 	//have to do at least one call to kick it off
-	log.Printf("My node id is %v", kademlia.RoutingTable.SelfContact.NodeID.AsString())
 	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, nodeToFind, kademlia.RoutingTable.SelfContact.NodeID)
 	log.Printf("Found initial %v nodes: ", len(foundContacts))
+
+	if len(foundContacts) == 0 {
+		return nil, nil
+	}
 
 	var closestPosition, farthestPosition int = 0, 0
 
@@ -235,8 +301,6 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 		}
 
 	}
-
-	printShortList(shortList, nodeToFind, closestPosition, farthestPosition)
 
 	log.Printf("Looking at the closestPosition:%v for a shortList of len:%v", closestPosition, len(shortList))
 
