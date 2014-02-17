@@ -5,3 +5,5 @@
 ./testkademlia localhost:4001 localhost:4000 5000000000000000000000000000000000000000 test_simple_iterative.anode.in test_store_find_value.anode.out test_store_find_value.anode.log &
 
 wait
+
+diff test_simple_iterative.iterative.out test_simple_iterative.iterative.out.expected >&1

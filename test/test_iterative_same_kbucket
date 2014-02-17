@@ -1,0 +1,26 @@
+#!/bin/bash
+
+./testkademlia localhost:4000 localhost:4000 1000000000000000000000000000000000000000 test_iterative_same_kbucket.iterative.in test_iterative_same_kbucket.iterative.out test_iterative_same_kbucket.iterative.log &
+
+./testkademlia localhost:4001 localhost:4000 5000000000000000000000000000000000000001 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4002 localhost:4000 5000000000000000000000000000000000000002 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4003 localhost:4000 5000000000000000000000000000000000000003 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4004 localhost:4000 5000000000000000000000000000000000000004 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4005 localhost:4000 5000000000000000000000000000000000000005 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4006 localhost:4000 5000000000000000000000000000000000000006 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4007 localhost:4000 5000000000000000000000000000000000000007 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4008 localhost:4000 5000000000000000000000000000000000000008 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4009 localhost:4000 5000000000000000000000000000000000000009 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4010 localhost:4000 500000000000000000000000000000000000000A test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4011 localhost:4000 500000000000000000000000000000000000000B test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4012 localhost:4000 500000000000000000000000000000000000000C test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4013 localhost:4000 500000000000000000000000000000000000000D test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4014 localhost:4000 500000000000000000000000000000000000000E test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4015 localhost:4000 500000000000000000000000000000000000000F test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4016 localhost:4000 5000000000000000000000000000000000000010 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4017 localhost:4000 5000000000000000000000000000000000000011 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4018 localhost:4000 5000000000000000000000000000000000000012 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4019 localhost:4000 5000000000000000000000000000000000000013 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4020 localhost:4000 5000000000000000000000000000000000000014 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+
+wait

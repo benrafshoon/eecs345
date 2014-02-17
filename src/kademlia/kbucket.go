@@ -1,6 +1,7 @@
 package kademlia
+
 /*
-	This file contains the implementation for a k-bucket. 
+	This file contains the implementation for a k-bucket.
 	The only function that should be needed externally is
 	NewBucket and PingBucket. PingBucket will either add
 	a contact to the bucket or send that contact to the end
@@ -15,7 +16,7 @@ import (
 )
 
 type kBucket struct {
-	list *list.List
+	list    *list.List
 	pending *Contact
 }
 
@@ -36,6 +37,7 @@ func (b *kBucket) AddOrMoveToTail(contact *Contact) bool {
 			b.list.MoveToBack(element)
 			return true
 		}
+		element = element.Next()
 	}
 	b.list.PushBack(contact)
 	return true
@@ -44,7 +46,7 @@ func (b *kBucket) AddOrMoveToTail(contact *Contact) bool {
 func (b *kBucket) DeleteFromHead(contact *Contact) {
 	head := b.list.Front()
 	if head != nil {
-		 b.list.Remove(head)
+		b.list.Remove(head)
 	}
 }
 
@@ -71,6 +73,7 @@ func (b *kBucket) FindContactByNodeID(lookupID ID) (bool, *Contact) {
 		if element.Value.(*Contact).NodeID.Equals(lookupID) {
 			return true, element.Value.(*Contact)
 		}
+		element = element.Next()
 	}
 	return false, nil
 }
@@ -86,7 +89,7 @@ func (b *kBucket) Delete(contact *Contact) bool {
 			b.list.Remove(element)
 			return true
 		}
+		element = element.Next()
 	}
 	return false
 }
-

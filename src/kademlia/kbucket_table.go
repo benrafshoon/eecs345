@@ -36,6 +36,7 @@ func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) (bool, *Contact) {
 	request := markAliveRequest{contact, make(chan markAliveResult)}
 	kBucketTable.requests <- request
 	result := <-request.result
+	log.Printf("Mark alive response received")
 	return result.toPing != nil, result.toPing
 }
 
@@ -85,6 +86,7 @@ func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 		default:
 			log.Printf("Invalid request to k-bucket table")
 		}
+		log.Printf("Finished k-bucket table operation")
 	}
 }
 

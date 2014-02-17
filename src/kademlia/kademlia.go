@@ -209,8 +209,8 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 	//This function should return a list of k closest contacts to the specified node
 	shortList := make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
 	//have to do at least one call to kick it off
+	log.Printf("My node id is %v", kademlia.RoutingTable.SelfContact.NodeID.AsString())
 	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, nodeToFind, kademlia.RoutingTable.SelfContact.NodeID)
-
 	log.Printf("Found initial %v nodes: ", len(foundContacts))
 
 	var closestPosition, farthestPosition int = 0, 0
@@ -244,6 +244,9 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 	triedAll := false
 	for !triedAll && !nothingCloser { //we will keep looping until we hit one of two conditions:
 
+		log.Printf("Beginning of iteration\n")
+		printShortList(shortList, nodeToFind, closestPosition, farthestPosition)
+
 		//there are k active nodes in the short list (tried everything) or nothing returned is closer than before
 		findNodeResponseChannel := make(chan []*Contact, const_alpha) //Up to alpha going at the same time
 		timer := time.NewTimer(timeout)                               //create a new timer
@@ -255,6 +258,7 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 					shortList[j].checked = true
 					if j != len(shortList)-1 {
 						triedAll = false
+						log.Printf("Tried all in short list")
 					}
 					//worrying about the address later
 					go func() {
@@ -326,6 +330,9 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 				checkedAllChannelsWithResponses = true
 			}
 		}
+
+		log.Printf("Iteration complete\n")
+		printShortList(shortList, nodeToFind, closestPosition, farthestPosition)
 	}
 
 	returnContacts := make([]*Contact, len(shortList))
