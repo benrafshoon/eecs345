@@ -1,21 +1,17 @@
 package kademlia
 
-
 import (
 	"log"
 )
-
 
 type kBucketTableRequest interface {
 	RequestType() string
 }
 
-
-
 type KBucketTable struct {
-	kBuckets []*kBucket
+	kBuckets    []*kBucket
 	SelfContact *Contact
-	requests chan kBucketTableRequest;
+	requests    chan kBucketTableRequest
 }
 
 func NewKBucketTable() *KBucketTable {
@@ -23,10 +19,10 @@ func NewKBucketTable() *KBucketTable {
 	table.SelfContact = new(Contact)
 	table.kBuckets = make([]*kBucket, const_B, const_B)
 	for i := 0; i < const_B; i++ {
-        table.kBuckets[i] = newKBucket()
-    }
-    table.requests = make(chan kBucketTableRequest)
-    go table.processKBucketTableRequests()
+		table.kBuckets[i] = newKBucket()
+	}
+	table.requests = make(chan kBucketTableRequest)
+	go table.processKBucketTableRequests()
 	return table
 }
 
@@ -39,7 +35,7 @@ func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) (bool, *Contact) {
 	log.Printf("Sending MarkAlive request")
 	request := markAliveRequest{contact, make(chan markAliveResult)}
 	kBucketTable.requests <- request
-	result := <- request.result
+	result := <-request.result
 	return result.toPing != nil, result.toPing
 }
 
@@ -50,31 +46,29 @@ func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
 	kBucketTable.requests <- request
 }
 
-
 //Thread-safe
 func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude ID) []*Contact {
 	log.Printf("Sending FindKClosestNodes request")
 	request := findKClosestNodesRequest{k, closestTo, exclude, make(chan findKClosestNodesResult)}
 	kBucketTable.requests <- request
-	result := <- request.result
+	result := <-request.result
 	return result.kClosestNodes
 }
 
 //Thread-safe
 //Returns hasContact?, isSelf?, contact
 func (kBucketTable *KBucketTable) LookupContactByNodeID(lookupID ID) (bool, bool, *Contact) {
-    log.Printf("Sending LookupContactByNodeID request")
-    request := lookupContactByNodeIDRequest{lookupID, make(chan lookupContactByNodeIDResult)}
-    kBucketTable.requests <- request
-    result := <- request.result
-    return result.hasContact, result.isSelf, result.contact
+	log.Printf("Sending LookupContactByNodeID request")
+	request := lookupContactByNodeIDRequest{lookupID, make(chan lookupContactByNodeIDResult)}
+	kBucketTable.requests <- request
+	result := <-request.result
+	return result.hasContact, result.isSelf, result.contact
 }
-
 
 func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 	log.Printf("Processing k-bucket table requests")
 	for {
-		request := <- kBucketTable.requests
+		request := <-kBucketTable.requests
 		switch request.RequestType() {
 		case "MarkAlive":
 			log.Printf("Received MarkAlive request")
@@ -94,11 +88,9 @@ func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 	}
 }
 
-
-
 type markAliveRequest struct {
 	contact *Contact
-	result chan markAliveResult
+	result  chan markAliveResult
 }
 
 func (r markAliveRequest) RequestType() string {
@@ -139,9 +131,6 @@ func (kBucketTable *KBucketTable) markAliveInternal(request markAliveRequest) {
 	request.result <- markAliveResult{toPing}
 }
 
-
-
-
 type markDeadRequest struct {
 	contact *Contact
 }
@@ -149,6 +138,7 @@ type markDeadRequest struct {
 func (r markDeadRequest) RequestType() string {
 	return "MarkDead"
 }
+
 //No response
 
 func (kBucketTable *KBucketTable) markDeadInternal(request markDeadRequest) {
@@ -162,13 +152,11 @@ func (kBucketTable *KBucketTable) markDeadInternal(request markDeadRequest) {
 	}
 }
 
-
-
 type findKClosestNodesRequest struct {
-	k int
+	k         int
 	closestTo ID
-	exclude ID
-	result chan findKClosestNodesResult
+	exclude   ID
+	result    chan findKClosestNodesResult
 }
 
 func (r findKClosestNodesRequest) RequestType() string {
@@ -193,18 +181,16 @@ func (kBucketTable *KBucketTable) findKClosestNodesInternal(request findKClosest
 			kClosest = insertIntoClosestSoFar(kClosest, element.Value.(*Contact), request.closestTo, request.exclude)
 			element = element.Next()
 		}
-		
+
 	}
 
 	request.result <- findKClosestNodesResult{kClosest}
 
 }
 
-
-
 type lookupContactByNodeIDRequest struct {
 	lookupID ID
-	result chan lookupContactByNodeIDResult
+	result   chan lookupContactByNodeIDResult
 }
 
 func (r lookupContactByNodeIDRequest) RequestType() string {
@@ -213,8 +199,8 @@ func (r lookupContactByNodeIDRequest) RequestType() string {
 
 type lookupContactByNodeIDResult struct {
 	hasContact bool
-	isSelf bool
-	contact *Contact
+	isSelf     bool
+	contact    *Contact
 }
 
 func (kBucketTable *KBucketTable) lookupContactByNodeIDInternal(request lookupContactByNodeIDRequest) {
@@ -224,20 +210,19 @@ func (kBucketTable *KBucketTable) lookupContactByNodeIDInternal(request lookupCo
 
 	bucketIndex := kBucketTable.SelfContact.NodeID.DistanceBucket(request.lookupID)
 	isSelf = bucketIndex == -1
-    if isSelf {
-    	hasContact = true
-        contact = kBucketTable.SelfContact
-    } else {
-        hasContact, contact = kBucketTable.kBuckets[bucketIndex].FindContactByNodeID(request.lookupID)
-    }
+	if isSelf {
+		hasContact = true
+		contact = kBucketTable.SelfContact
+	} else {
+		hasContact, contact = kBucketTable.kBuckets[bucketIndex].FindContactByNodeID(request.lookupID)
+	}
 
-    request.result <- lookupContactByNodeIDResult{hasContact, isSelf, contact}
+	request.result <- lookupContactByNodeIDResult{hasContact, isSelf, contact}
 }
-
 
 //Helper function
 func intMin(a int, b int) int {
-	if(a < b) {
+	if a < b {
 		return a
 	} else {
 		return b
@@ -255,11 +240,11 @@ func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestT
 			//Insert toInsert at position i
 
 			if len(closestSoFar) < cap(closestSoFar) {
-				closestSoFar = closestSoFar[0:len(closestSoFar) + 1]
+				closestSoFar = closestSoFar[0 : len(closestSoFar)+1]
 			}
 
-			for j := intMin(len(closestSoFar) - 1, cap(closestSoFar) - 2); j >= i; j-- {
-				closestSoFar[j + 1] = closestSoFar[j]
+			for j := intMin(len(closestSoFar)-1, cap(closestSoFar)-2); j >= i; j-- {
+				closestSoFar[j+1] = closestSoFar[j]
 			}
 
 			closestSoFar[i] = toInsert
@@ -269,14 +254,9 @@ func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestT
 	}
 	//if len < cap, append to end
 	if len(closestSoFar) < cap(closestSoFar) {
-		closestSoFar = closestSoFar[0:len(closestSoFar) + 1]
-		closestSoFar[len(closestSoFar) - 1] = toInsert
+		closestSoFar = closestSoFar[0 : len(closestSoFar)+1]
+		closestSoFar[len(closestSoFar)-1] = toInsert
 	}
 
 	return closestSoFar
 }
-
-
-
-
-

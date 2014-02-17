@@ -1,0 +1,7 @@
+#!/bin/bash
+
+./testkademlia localhost:4000 localhost:4000 1000000000000000000000000000000000000000 test_simple_iterative.iterative.in test_simple_iterative.iterative.out test_simple_iterative.iterative.log &
+
+./testkademlia localhost:4001 localhost:4000 5000000000000000000000000000000000000000 test_simple_iterative.anode.in test_store_find_value.anode.out test_store_find_value.anode.log &
+
+wait
