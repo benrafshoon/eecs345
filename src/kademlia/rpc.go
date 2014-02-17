@@ -5,7 +5,7 @@ package kademlia
 // other groups' code.
 
 import (
-	"fmt"
+	//"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -16,10 +16,6 @@ type Contact struct {
 	NodeID ID
 	Host   net.IP
 	Port   uint16
-}
-
-func (contact *Contact) GetAddress() string {
-	return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
 }
 
 func (contact *Contact) ToFoundNode() FoundNode {

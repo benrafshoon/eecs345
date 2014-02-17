@@ -36,7 +36,6 @@ func (kBucketTable *KBucketTable) MarkAlive(contact *Contact) (bool, *Contact) {
 	request := markAliveRequest{contact, make(chan markAliveResult)}
 	kBucketTable.requests <- request
 	result := <-request.result
-	log.Printf("Mark alive response received")
 	return result.toPing != nil, result.toPing
 }
 
@@ -86,7 +85,6 @@ func (kBucketTable *KBucketTable) processKBucketTableRequests() {
 		default:
 			log.Printf("Invalid request to k-bucket table")
 		}
-		log.Printf("Finished k-bucket table operation")
 	}
 }
 
@@ -144,7 +142,15 @@ func (r markDeadRequest) RequestType() string {
 //No response
 
 func (kBucketTable *KBucketTable) markDeadInternal(request markDeadRequest) {
+	if len(request.contact.NodeID) == 0 {
+		log.Printf("Node ID nil")
+		return
+	}
 	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
+	if distanceBucket == -1 {
+		log.Printf("Marking self dead")
+		return
+	}
 	kBucket := kBucketTable.kBuckets[distanceBucket]
 	kBucket.Delete(request.contact)
 	if kBucket.pending != nil {
@@ -242,10 +248,13 @@ func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestT
 			//Insert toInsert at position i
 
 			if len(closestSoFar) < cap(closestSoFar) {
+				log.Printf("Exapanding capacity from %v to %v", len(closestSoFar), len(closestSoFar)+1)
 				closestSoFar = closestSoFar[0 : len(closestSoFar)+1]
+			} else {
+				log.Printf("ClosestSoFar Full")
 			}
-
-			for j := intMin(len(closestSoFar)-1, cap(closestSoFar)-2); j >= i; j-- {
+			log.Printf("len %v cap %v min %v", len(closestSoFar), cap(closestSoFar), intMin(len(closestSoFar)-1, cap(closestSoFar)-2))
+			for j := len(closestSoFar) - 2; j >= i; j-- {
 				closestSoFar[j+1] = closestSoFar[j]
 			}
 

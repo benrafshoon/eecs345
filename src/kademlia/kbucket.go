@@ -28,9 +28,6 @@ func newKBucket() *kBucket {
 }
 
 func (b *kBucket) AddOrMoveToTail(contact *Contact) bool {
-	if b.IsFull() {
-		return false
-	}
 	element := b.list.Front()
 	for element != nil {
 		if element.Value.(*Contact).NodeID.Equals(contact.NodeID) {
@@ -39,8 +36,12 @@ func (b *kBucket) AddOrMoveToTail(contact *Contact) bool {
 		}
 		element = element.Next()
 	}
-	b.list.PushBack(contact)
-	return true
+	if b.IsFull() {
+		return false
+	} else {
+		b.list.PushBack(contact)
+		return true
+	}
 }
 
 func (b *kBucket) DeleteFromHead(contact *Contact) {

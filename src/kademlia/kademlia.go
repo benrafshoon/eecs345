@@ -18,7 +18,7 @@ import (
 const const_alpha = 3
 const const_B = 160
 const const_k = 20
-const timeout = 300 * 1000 //milliseconds
+const timeout = 300 * time.Millisecond //milliseconds
 
 type Kademlia struct {
 	RoutingTable *KBucketTable
@@ -156,14 +156,13 @@ func (kademlia *Kademlia) markAliveAndPossiblyPing(contact *Contact) {
 //The contact to send a ping to is not required to have a NodeID
 //The NodeID is returned if the contact responded
 func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
-	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
+	log.Printf("Sending ping to %v\n", kademlia.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", kademlia.GetContactAddress(contact))
 	if err != nil {
 		log.Printf("Connection error, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
 		return nil, err
 	}
-
-	log.Printf("Sending ping to %v\n", contact.GetAddress())
 
 	ping := new(Ping)
 	ping.Sender = *kademlia.RoutingTable.SelfContact
@@ -175,14 +174,12 @@ func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 		kademlia.RoutingTable.MarkDead(contact)
 		return nil, err
 	}
-	if ping.MsgID.Equals(pong.MsgID) {
-		log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
-		log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
-		kademlia.RoutingTable.MarkAlive(&pong.Sender)
 
+	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
+	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
+	if ping.MsgID.Equals(pong.MsgID) {
+		kademlia.RoutingTable.MarkAlive(&pong.Sender)
 	} else {
-		log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
-		log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
 		log.Printf("Incorrect MsgID\n")
 		log.Printf("  Ping Message ID: %v\n", ping.MsgID.AsString())
 		log.Printf("  Pong Message ID: %v\n", pong.MsgID.AsString())
@@ -196,13 +193,14 @@ func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 }
 
 func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) error {
-	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
+	log.Printf("Sending store to %v\n", kademlia.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", kademlia.GetContactAddress(contact))
 	if err != nil {
 		log.Printf("Connection error, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
 		return err
 	}
-	log.Printf("Sending store to %v\n", contact.GetAddress())
+
 	storeRequest := new(StoreRequest)
 	storeRequest.Sender = *kademlia.RoutingTable.SelfContact
 	storeRequest.MsgID = NewRandomID()
@@ -217,13 +215,11 @@ func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) erro
 		return err
 	}
 
+	log.Printf("Received response to SendStore from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
+	log.Printf("                           Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
 	if storeRequest.MsgID.Equals(storeResult.MsgID) {
-		log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
-		log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
 		kademlia.markAliveAndPossiblyPing(contact)
 	} else {
-		log.Printf("Received response from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
-		log.Printf("              Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
 		log.Printf("Incorrect MsgID\n")
 		log.Printf("      Request Message ID: %v\n", storeRequest.MsgID.AsString())
 		log.Printf("       Result Message ID: %v\n", storeResult.MsgID.AsString())
@@ -306,6 +302,7 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 
 	nothingCloser := false
 	triedAll := false
+	numResponsesSent := 0
 	for !triedAll && !nothingCloser { //we will keep looping until we hit one of two conditions:
 
 		log.Printf("Beginning of iteration\n")
@@ -315,42 +312,44 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 		findNodeResponseChannel := make(chan []*Contact, const_alpha) //Up to alpha going at the same time
 		timer := time.NewTimer(timeout)                               //create a new timer
 		for i := 0; i < const_alpha; i++ {
-			triedAll = true //let's assume we've tried everything
 			//let's pick the first three things that haven't been checked
 			for j := 0; j < len(shortList); j++ {
 				if shortList[j].checked == false {
 					shortList[j].checked = true
-					if j != len(shortList)-1 {
-						triedAll = false
-						log.Printf("Tried all in short list")
-					}
+					log.Printf("Finding node %v", shortList[j].contact.NodeID.AsString())
 					//worrying about the address later
 					go func() {
 						error, result := kademlia.SendFindNode(shortList[j].contact, shortList[j].contact.NodeID) //send out the separate threads
+						log.Printf("Find node response received, len %v, error? %v", len(result), error)
 						if error == nil {
+							log.Printf("Put shit in channel")
 							findNodeResponseChannel <- result
 						}
 					}()
+					numResponsesSent++
 					break
 				}
 			}
 		}
-		<-timer.C //stop executing until the timer runs out
+
 		log.Printf("Looking at the closestPosition:%v", closestPosition)
 		closestDistance := shortList[closestPosition].contact.NodeID.DistanceBucket(nodeToFind)
 		farthestDistance := shortList[farthestPosition].contact.NodeID.DistanceBucket(nodeToFind)
 		//Collect everything
 		nothingCloser = true //true until proven guilty
 
-		checkedAllChannelsWithResponses := false
-		for !checkedAllChannelsWithResponses {
+		timedOut := false
+		numResponsesReceived := 0
+		for !timedOut && numResponsesReceived != numResponsesSent {
 			select {
 			case newNodes := <-findNodeResponseChannel:
+				numResponsesReceived++
 
 				for j := 0; j < len(newNodes); j++ { //look through every item we found
-
+					log.Printf("   Adding node %v", newNodes[j].NodeID.AsString())
 					//Ignore nodes we already have in the shortlist
 					if shortListContains(shortList, newNodes[j]) {
+						log.Printf("   Node already in shortlist")
 						continue
 					}
 
@@ -390,13 +389,31 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 						}
 					}
 				}
-			default:
-				checkedAllChannelsWithResponses = true
+				if numResponsesReceived == numResponsesSent {
+					log.Printf("All responses received")
+				}
+			case <-timer.C: //stop executing until the timer runs out
+				log.Printf("timed out")
+				timedOut = true
+			}
+		}
+
+		triedAll = true
+		for i := 0; i < len(shortList); i++ {
+			if shortList[i].checked == false {
+				triedAll = false
+				break
 			}
 		}
 
 		log.Printf("Iteration complete\n")
 		printShortList(shortList, nodeToFind, closestPosition, farthestPosition)
+		if triedAll {
+			log.Printf("Search terminated because tried all in short list")
+		}
+		if nothingCloser {
+			log.Printf("Search terminated because nothing closer found in iteration")
+		}
 	}
 
 	returnContacts := make([]*Contact, len(shortList))
@@ -407,14 +424,14 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 }
 
 func (kademlia *Kademlia) SendFindNode(contact *Contact, nodeToFind ID) (error, []*Contact) {
-	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
+	log.Printf("Sending FindNode to %v\n", kademlia.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", kademlia.GetContactAddress(contact))
 
 	if err != nil {
 		log.Printf("Connection error, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
 		return err, nil
 	}
-	log.Printf("Sending find node to %v\n", contact.GetAddress())
 	findNodeRequest := new(FindNodeRequest)
 	findNodeRequest.Sender = *kademlia.RoutingTable.SelfContact
 	findNodeRequest.MsgID = NewRandomID()
@@ -427,38 +444,41 @@ func (kademlia *Kademlia) SendFindNode(contact *Contact, nodeToFind ID) (error, 
 		kademlia.RoutingTable.MarkDead(contact)
 		return err, nil
 	}
+	log.Printf("Received response FindNode from %v:%v\n", contact.Host, contact.Port)
+	log.Printf("                           Node ID: %v\n", contact.NodeID.AsString())
 
-	log.Printf("Received response\n")
+	var contacts []*Contact = nil
 
 	if findNodeRequest.MsgID.Equals(findNodeResult.MsgID) {
 		kademlia.markAliveAndPossiblyPing(contact)
-		contacts := make([]*Contact, len(findNodeResult.Nodes), len(findNodeResult.Nodes))
+		contacts = make([]*Contact, len(findNodeResult.Nodes), len(findNodeResult.Nodes))
 
 		for i := 0; i < len(findNodeResult.Nodes); i++ {
+			log.Printf("    Found node %v in response: %v", i, findNodeResult.Nodes[i].NodeID.AsString())
 			contacts[i] = findNodeResult.Nodes[i].ToContact()
 		}
-		return nil, contacts
 
 	} else {
 		log.Printf("Incorrect MsgID\n")
 		log.Printf("      Request Message ID: %v\n", findNodeRequest.MsgID.AsString())
 		log.Printf("       Result Message ID: %v\n", findNodeResult.MsgID.AsString())
 		kademlia.RoutingTable.MarkDead(contact)
-		return errors.New("Incorrect MsgID"), nil
+		err = errors.New("Incorrect MsgID")
 	}
 	client.Close()
-	return nil, nil
+	return err, contacts
 }
 
 func (kademlia *Kademlia) SendFindValue(contact *Contact, key ID) (error, []byte, []*Contact) {
-	client, err := rpc.DialHTTP("tcp", contact.GetAddress())
+	log.Printf("Sending FindValue to %v\n", kademlia.GetContactAddress(contact))
+	log.Printf("         Key to find: %v\n", key.AsString())
+	client, err := rpc.DialHTTP("tcp", kademlia.GetContactAddress(contact))
 	if err != nil {
 		log.Printf("Connection error, marking node dead")
 		kademlia.RoutingTable.MarkDead(contact)
 		return err, nil, nil
 	}
-	log.Printf("Sending find value to %v\n", contact.GetAddress())
-	log.Printf("         Key to find: %v\n", key.AsString())
+
 	findValueRequest := new(FindValueRequest)
 	findValueRequest.Sender = *kademlia.RoutingTable.SelfContact
 	findValueRequest.MsgID = NewRandomID()
@@ -472,14 +492,17 @@ func (kademlia *Kademlia) SendFindValue(contact *Contact, key ID) (error, []byte
 		return err, nil, nil
 	}
 
-	log.Printf("Received response\n")
+	log.Printf("Received response FindValue from %v:%v\n", contact.Host, contact.Port)
+	log.Printf("                           Node ID: %v\n", contact.NodeID.AsString())
 	if findValueRequest.MsgID.Equals(findValueResult.MsgID) {
 		kademlia.markAliveAndPossiblyPing(contact)
 		if findValueResult.Value != nil {
+			log.Printf("     Found value %v", string(findValueResult.Value))
 			return nil, findValueResult.Value, nil
 		} else {
 			contacts := make([]*Contact, len(findValueResult.Nodes), len(findValueResult.Nodes))
 			for i := 0; i < len(findValueResult.Nodes); i++ {
+				log.Printf("    Found node %v in response: %v", i, findValueResult.Nodes[i].NodeID.AsString())
 				contacts[i] = findValueResult.Nodes[i].ToContact()
 			}
 			return nil, nil, contacts
@@ -494,4 +517,13 @@ func (kademlia *Kademlia) SendFindValue(contact *Contact, key ID) (error, []byte
 	}
 	client.Close()
 	return nil, nil, nil
+}
+
+func (kademlia *Kademlia) GetContactAddress(contact *Contact) string {
+	if contact.Host.Equal(kademlia.RoutingTable.SelfContact.Host) {
+		return fmt.Sprintf("%v:%v", "localhost", contact.Port)
+	} else {
+		return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
+	}
+
 }

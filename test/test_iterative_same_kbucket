@@ -21,6 +21,6 @@
 ./testkademlia localhost:4017 localhost:4000 5000000000000000000000000000000000000011 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
 ./testkademlia localhost:4018 localhost:4000 5000000000000000000000000000000000000012 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
 ./testkademlia localhost:4019 localhost:4000 5000000000000000000000000000000000000013 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
-./testkademlia localhost:4020 localhost:4000 5000000000000000000000000000000000000014 test_iterative_same_kbucket.anode.in /dev/null /dev/null &
+./testkademlia localhost:4020 localhost:4000 5000000000000000000000000000000000000014 test_iterative_same_kbucket.anode.in /dev/null test.log &
 
 wait

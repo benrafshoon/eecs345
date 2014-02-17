@@ -67,7 +67,6 @@ func main() {
 	for !quit {
 
 		input, err := in.ReadString('\n')
-		log.Printf(" command: ", input)
 		if err != nil {
 			//Still do the last command, but then quit
 			quit = true
