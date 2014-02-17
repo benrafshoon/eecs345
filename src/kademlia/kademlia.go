@@ -271,8 +271,8 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, nodeToFind, kademlia.RoutingTable.SelfContact.NodeID)
 
 	if len(foundContacts) <= 0 {
-		err := errors.New("No initial nodes found")
-		return err, nil
+		log.Printf("No initial nodes found")
+		return nil, foundContacts
 	}
 
 	var closestPosition, farthestPosition int = 0, 0
@@ -336,7 +336,9 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 
 		timedOut := false
 		numResponsesReceived := 0
+		//Terminate once we have received responses from all the FindNodes we sent out, or when we timeout
 		for !timedOut && numResponsesReceived != numResponsesSent {
+			//Read from response channel, or check if timed out
 			select {
 			case newNodes := <-findNodeResponseChannel:
 				numResponsesReceived++
