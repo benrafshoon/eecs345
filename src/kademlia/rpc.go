@@ -5,7 +5,6 @@ package kademlia
 // other groups' code.
 
 import (
-	//"fmt"
 	"log"
 	"net"
 	"strconv"

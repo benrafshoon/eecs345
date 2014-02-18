@@ -1,18 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
-	//"net"
-	//"net/http"
-	//"net/rpc"
-	"bufio"
 	"os"
 	"strings"
 	"time"
-	"io/ioutil"
 )
 
 import (
@@ -80,12 +77,12 @@ func main() {
 			fmt.Printf("%v\n Node ID: %v\n", kademliaServer.GetNodeID().AsString(), kademliaServer.GetNodeID())
 		case "local_find_value":
 			if len(command) < 2 {
-				log.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"")
+				fmt.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"\n")
 				continue
 			}
 			id, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"local_find_value\": %v", error)
+				fmt.Printf("Error in command \"local_find_value\": %v\n", error)
 				continue
 			}
 
@@ -99,12 +96,12 @@ func main() {
 
 		case "get_contact":
 			if len(command) < 2 {
-				log.Printf("Error in command \"get_contact\": must enter ID, command must be of the form \"get_contact ID\"")
+				fmt.Printf("Error in command \"get_contact\": must enter ID, command must be of the form \"get_contact ID\"\n")
 				continue
 			}
 			id, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"get_contact\": %v", error)
+				fmt.Printf("Error in command \"get_contact\": %v\n", error)
 				continue
 			}
 
@@ -122,12 +119,12 @@ func main() {
 
 		case "iterativeStore":
 			if len(command) < 3 {
-				log.Printf("Error in command \"store\": command must be of the form \"store key value\"")
+				fmt.Printf("Error in command \"store\": command must be of the form \"store key value\"\n")
 				continue
 			}
 			key, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"store\": key: %v", error)
+				fmt.Printf("Error in command \"store\": key: %v\n", error)
 				continue
 			}
 			value := []byte(strings.SplitAfterN(input, " ", 3)[2])
@@ -144,12 +141,12 @@ func main() {
 
 		case "iterativeFindNode":
 			if len(command) < 2 {
-				log.Printf("Error in command \"iterativeFindNode\": command must be of the form \"iterativeFindNode nodeID\"")
+				fmt.Printf("Error in command \"iterativeFindNode\": command must be of the form \"iterativeFindNode nodeID\"\n")
 				continue
 			}
 			nodeID, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"iterativeFindNode\": nodeID: %v", error)
+				fmt.Printf("Error in command \"iterativeFindNode\": nodeID: %v\n", error)
 				continue
 			}
 
@@ -176,12 +173,12 @@ func main() {
 
 		case "iterativeFindValue":
 			if len(command) < 2 {
-				log.Printf("Error in command \"iterativeFindValue\": command must be of the form \"iterativeFindValue key\"")
+				fmt.Printf("Error in command \"iterativeFindValue\": command must be of the form \"iterativeFindValue key\"\n")
 				continue
 			}
 			key, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"iterativeFindValue\": key: %v", error)
+				fmt.Printf("Error in command \"iterativeFindValue\": key: %v\n", error)
 				continue
 			}
 
@@ -212,7 +209,7 @@ func main() {
 
 		case "ping":
 			if len(command) < 2 {
-				log.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"")
+				fmt.Printf("Error in command \"ping\": must enter address or node if, command must be of the form \"ping nodeID\" or \"ping host:port\"\n")
 				continue
 			}
 			if firstContact, error := kademlia.NewContactFromAddressString(command[1]); error == nil {
@@ -225,7 +222,7 @@ func main() {
 				//ping nodeID
 				id, error := kademlia.FromString(command[1])
 				if error != nil {
-					log.Printf("Error in command \"ping\": nodeID: %v", error)
+					fmt.Printf("Error in command \"ping\": nodeID: %v\n", error)
 					continue
 				}
 
@@ -246,17 +243,17 @@ func main() {
 			}
 		case "store":
 			if len(command) < 4 {
-				log.Printf("Error in command \"store\": command must be of the form \"store nodeID key value\"")
+				fmt.Printf("Error in command \"store\": command must be of the form \"store nodeID key value\"\n")
 				continue
 			}
 			nodeID, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"store\": nodeID: %v", error)
+				fmt.Printf("Error in command \"store\": nodeID: %v\n", error)
 				continue
 			}
 			key, error := kademlia.FromString(command[2])
 			if error != nil {
-				log.Printf("Error in command \"store\": key: %v", error)
+				fmt.Printf("Error in command \"store\": key: %v\n", error)
 				continue
 			}
 			value := []byte(strings.SplitAfterN(input, " ", 4)[3])
@@ -276,18 +273,18 @@ func main() {
 			}
 		case "find_node":
 			if len(command) < 3 {
-				log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"")
+				fmt.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID key\"\n")
 				continue
 			}
 			nodeID, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"find_node\": nodeID: %v", error)
+				fmt.Printf("Error in command \"find_node\": nodeID: %v\n", error)
 				continue
 			}
 
 			nodeToFind, error := kademlia.FromString(command[2])
 			if error != nil {
-				log.Printf("Error in command \"find_node\": key: %v", error)
+				fmt.Printf("Error in command \"find_node\": key: %v\n", error)
 				continue
 			}
 			log.Printf("Finding nodes close to %v from node %v", nodeToFind.AsString(), nodeID.AsString())
@@ -318,18 +315,18 @@ func main() {
 
 		case "find_value":
 			if len(command) < 3 {
-				log.Printf("Error in command \"find_value\": command must be of the form \"find_node nodeID key\"")
+				fmt.Printf("Error in command \"find_value\": command must be of the form \"find_node nodeID key\"\n")
 				continue
 			}
 			nodeID, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"find_value\": nodeID: %v", error)
+				fmt.Printf("Error in command \"find_value\": nodeID: %v\n", error)
 				continue
 			}
 
 			key, error := kademlia.FromString(command[2])
 			if error != nil {
-				log.Printf("Error in command \"find_value\": key: %v", error)
+				fmt.Printf("Error in command \"find_value\": key: %v\n", error)
 				continue
 			}
 			log.Printf("Finding value with key %v from node %v", key.AsString(), nodeID.AsString())
@@ -362,7 +359,7 @@ func main() {
 				fmt.Printf("%v\n", foundIDs)
 			}
 		default:
-			log.Printf("Unrecognized command: %s", command[0])
+			fmt.Printf("Unrecognized command: %s\n", command[0])
 		}
 	}
 }

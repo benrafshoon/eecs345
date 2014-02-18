@@ -26,6 +26,9 @@ func NewKBucketTable() *KBucketTable {
 	return table
 }
 
+//All thread-safe function calls go through a channel with a goroutine
+//that responds to one request at a time to ensure data integrity
+
 //Thread-safe
 //Returns needToPing, contactToPing
 //needToPing will be true if the contact being marked alive is new in a k bucket
@@ -106,7 +109,7 @@ func (kBucketTable *KBucketTable) markAliveInternal(request markAliveRequest) {
 	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
 	if distanceBucket != -1 {
 		kBucket := kBucketTable.kBuckets[distanceBucket]
-		log.Printf("Marking node %v in bucket %v as alive", request.contact.NodeID.AsString(), distanceBucket)
+		//log.Printf("Marking node %v in bucket %v as alive", request.contact.NodeID.AsString(), distanceBucket)
 		if kBucket.AddOrMoveToTail(request.contact) {
 			//Could add or already in table
 			if kBucket.pending != nil && kBucket.GetHead().Equals(request.contact) {

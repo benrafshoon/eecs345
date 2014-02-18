@@ -18,14 +18,13 @@ import (
 const const_alpha = 3
 const const_B = 160
 const const_k = 20
-const timeout = 300 * time.Millisecond //milliseconds
+const timeout = 300 * time.Millisecond
 
 type Kademlia struct {
 	RoutingTable *KBucketTable
 	Data         *KeyValueStore
 }
 
-//
 type IterativeContact struct {
 	contact *Contact
 	checked bool
@@ -60,14 +59,12 @@ func (kademlia *Kademlia) InitializeRoutingTable(firstNode *Contact) error {
 
 	//Refresh all buckets that aren't the bucket of the closest neighbor
 	//aka all buckets except the first occupied
-	log.Printf("Refreshing all buckets that arent the closest neighbor")
 	for i := 0; i < const_B; i++ {
 		if closestNeighborBucketFound {
 			kademlia.refreshBucket(i)
 		} else {
 			if !kademlia.RoutingTable.kBuckets[i].IsEmpty() {
 				closestNeighborBucketFound = true
-				log.Printf("First occupied bucket %v, will refresh the rest", i)
 			}
 		}
 	}
@@ -77,8 +74,7 @@ func (kademlia *Kademlia) InitializeRoutingTable(firstNode *Contact) error {
 func (kademlia *Kademlia) refreshBucket(bucket int) {
 	randomID := kademlia.RoutingTable.SelfContact.NodeID.RandomIDInBucket(bucket)
 	log.Printf("Refreshing bucket %v using random ID in bucket: %v", bucket, randomID.AsString())
-	//Not sure if we should mark the results as alive or do nothing with the results
-	kademlia.SendIterativeFindNode(randomID)
+	kademlia.SendIterativeFindNode(randomID) //All results will be marked alive in the routing table
 }
 
 func (kademlia *Kademlia) StartKademliaServer(address string) error {
@@ -92,11 +88,12 @@ func (kademlia *Kademlia) StartKademliaServer(address string) error {
 	if error != nil {
 		return error
 	}
+
+	//Get our IPv4 address
 	hostname, error := os.Hostname()
 	if error != nil {
 		return error
 	}
-
 	ipAddrStrings, error := net.LookupHost(hostname)
 	var host net.IP
 	for i := 0; i < len(ipAddrStrings); i++ {
@@ -105,15 +102,13 @@ func (kademlia *Kademlia) StartKademliaServer(address string) error {
 			break
 		}
 	}
-	log.Printf("ip address: %v", host)
+	kademlia.RoutingTable.SelfContact.Host = host
 
+	//Get our port number
 	_, port, error := net.SplitHostPort(listener.Addr().String())
 	if error != nil {
 		return error
 	}
-
-	kademlia.RoutingTable.SelfContact.Host = host
-
 	portInt, error := strconv.ParseUint(port, 10, 16)
 	if error != nil {
 		return error
@@ -132,6 +127,9 @@ func (kademlia *Kademlia) GetNodeID() ID {
 	return kademlia.RoutingTable.SelfContact.NodeID
 }
 
+//If a k-bucket is full, mark alive will return a node that needs to be pinged
+//This is the head of the k-bucket, and if it turns out it is dead, the node
+//we are adding will replace the dead node in the k-bucket
 func (kademlia *Kademlia) markAliveAndPossiblyPing(contact *Contact) {
 	needToPing, contactToPing := kademlia.RoutingTable.MarkAlive(contact)
 	if needToPing {
@@ -154,6 +152,7 @@ func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 	ping.Sender = *kademlia.RoutingTable.SelfContact
 	ping.MsgID = NewRandomID()
 	var pong Pong
+
 	err = client.Call("Kademlia.Ping", ping, &pong)
 	if err != nil {
 		log.Printf("Error in remote node response, marking node dead")
@@ -163,17 +162,16 @@ func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 
 	log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
 	log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
+
 	if ping.MsgID.Equals(pong.MsgID) {
-		kademlia.RoutingTable.MarkAlive(&pong.Sender)
+		kademlia.markAliveAndPossiblyPing(&pong.Sender)
 	} else {
 		log.Printf("Incorrect MsgID\n")
 		log.Printf("  Ping Message ID: %v\n", ping.MsgID.AsString())
 		log.Printf("  Pong Message ID: %v\n", pong.MsgID.AsString())
-
 		kademlia.RoutingTable.MarkDead(contact)
 	}
 
-	//Not sure if we should close the connection
 	client.Close()
 	return &pong.Sender, nil
 }
@@ -203,6 +201,7 @@ func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) erro
 
 	log.Printf("Received response to SendStore from %v:%v\n", storeRequest.Sender.Host, storeRequest.Sender.Port)
 	log.Printf("                           Node ID: %v\n", storeRequest.Sender.NodeID.AsString())
+
 	if storeRequest.MsgID.Equals(storeResult.MsgID) {
 		kademlia.markAliveAndPossiblyPing(contact)
 	} else {
@@ -317,15 +316,15 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 		if distance > farthestDistance {
 			farthestPosition = i
 		}
-
 	}
 
 	nothingCloser := false
 	triedAll := false
 	numResponsesSent := 0
+
 	for !triedAll && !nothingCloser { //we will keep looping until we hit one of two conditions:
 
-		printShortList(shortList, toFind, closestPosition, farthestPosition)
+		//printShortList(shortList, toFind, closestPosition, farthestPosition)
 
 		//there are k active nodes in the short list (tried everything) or nothing returned is closer than before
 		iterativeStepResultChannel := make(chan iterativeStepResult, const_alpha) //Up to alpha going at the same time
@@ -339,7 +338,6 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 					//worrying about the address later
 
 					go func(toContact *Contact) { //send out the separate threads
-
 						var error error = nil
 						var foundValue []byte = nil
 						var foundContacts []*Contact = nil
@@ -372,7 +370,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 		numResponsesReceived := 0
 		//Terminate once we have received responses from all the FindNodes we sent out, or when we timeout
 		for !timedOut && numResponsesReceived != numResponsesSent {
-			//Read from response channel, or check if timed out
+			//Read from response channel and check if timed out
 			select {
 			case result := <-iterativeStepResultChannel:
 				if result.FoundValue != nil {
@@ -476,7 +474,6 @@ func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contac
 	error, _, _, contacts := kademlia.iterativeOperation(nodeToFind, iterativeFindNodeOperation)
 	kademlia.PrintRoutingTable()
 	return error, contacts
-
 }
 
 func (kademlia *Kademlia) SendIterativeFindValue(keyToFind ID) (error, *Contact, []byte, []*Contact) {
@@ -592,13 +589,14 @@ func (kademlia *Kademlia) SendFindValue(contact *Contact, key ID) (error, []byte
 	return nil, nil, nil
 }
 
+//net.Dial doesn't seem to like when you put the local machine's external ip address
+//so use 'localhost' instead
 func (kademlia *Kademlia) GetContactAddress(contact *Contact) string {
 	if contact.Host.Equal(kademlia.RoutingTable.SelfContact.Host) {
 		return fmt.Sprintf("%v:%v", "localhost", contact.Port)
 	} else {
 		return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
 	}
-
 }
 
 func (kademlia *Kademlia) PrintRoutingTable() {
@@ -613,7 +611,6 @@ func (kademlia *Kademlia) PrintRoutingTable() {
 				j++
 				element = element.Next()
 			}
-
 		}
 	}
 }
