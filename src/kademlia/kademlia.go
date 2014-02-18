@@ -438,7 +438,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 							farthestDistance = 0
 							for k := 0; k < len(shortList); k++ {
 								distance = shortList[k].contact.NodeID.DistanceBucket(toFind)
-								farthestDistance = shortList[farthestDistance].contact.NodeID.DistanceBucket(toFind)
+								farthestDistance = shortList[farthestPosition].contact.NodeID.DistanceBucket(toFind)
 								if distance > farthestDistance {
 									farthestDistance = k
 								}
