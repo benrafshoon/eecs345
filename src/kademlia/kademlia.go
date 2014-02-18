@@ -500,6 +500,25 @@ func (kademlia *Kademlia) SendIterativeFindValue(keyToFind ID) (error, *Contact,
 	return kademlia.iterativeOperation(keyToFind, iterativeFindValueOperation)
 }
 
+func (kademlia *Kademlia) SendIterativeStore(key ID, value []byte) (*Contact, error) {
+	error, contacts := kademlia.SendIterativeFindNode(key)
+	if error != nil {
+		return nil, error
+	}
+
+	//Right now, iterative find node never returns self, so its possible contacts will be empty
+	if len(contacts) == 0 {
+		contacts = make([]*Contact, 1, 1)
+		contacts[0] = kademlia.RoutingTable.SelfContact
+	}
+
+	for i := 0; i < len(contacts); i++ {
+		kademlia.SendStore(contacts[i], key, value)
+	}
+
+	return contacts[len(contacts)-1], nil
+}
+
 func (kademlia *Kademlia) SendFindNode(contact *Contact, nodeToFind ID) (error, []*Contact) {
 	log.Printf("Sending FindNode to %v\n", kademlia.GetContactAddress(contact))
 	client, err := rpc.DialHTTP("tcp", kademlia.GetContactAddress(contact))

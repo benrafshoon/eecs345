@@ -120,7 +120,26 @@ func main() {
 			fmt.Printf("%v %v\n", contact.Host, contact.Port)
 
 		case "iterativeStore":
-			log.Printf("Not yet implemented")
+			if len(command) < 3 {
+				log.Printf("Error in command \"store\": command must be of the form \"store key value\"")
+				continue
+			}
+			key, error := kademlia.FromString(command[1])
+			if error != nil {
+				log.Printf("Error in command \"store\": key: %v", error)
+				continue
+			}
+			value := []byte(strings.SplitAfterN(input, " ", 3)[2])
+			if len(value) > 4095 {
+				value = value[0:4094]
+			}
+			log.Printf("Store %v <- %v\n", key.AsString(), string(value))
+			finalContact, error := kademliaServer.SendIterativeStore(key, value)
+			if error != nil {
+				fmt.Printf("ERR\n")
+				continue
+			}
+			fmt.Printf("%v\n", finalContact.NodeID)
 
 		case "iterativeFindNode":
 			if len(command) < 2 {
