@@ -54,15 +54,7 @@ func (kademlia *Kademlia) InitializeRoutingTable(firstNode *Contact) error {
 	}
 
 	log.Printf("Performing an iterative find node on self")
-	error, newContacts := kademlia.SendIterativeFindNode(kademlia.RoutingTable.SelfContact.NodeID)
-
-	if error != nil {
-		return error
-	}
-	//Not sure if we should add these contacts
-	for i := 0; i < len(newContacts); i++ {
-		kademlia.markAliveAndPossiblyPing(newContacts[i])
-	}
+	kademlia.SendIterativeFindNode(kademlia.RoutingTable.SelfContact.NodeID)
 
 	closestNeighborBucketFound := false
 
@@ -86,13 +78,7 @@ func (kademlia *Kademlia) refreshBucket(bucket int) {
 	randomID := kademlia.RoutingTable.SelfContact.NodeID.RandomIDInBucket(bucket)
 	log.Printf("Refreshing bucket %v using random ID in bucket: %v", bucket, randomID.AsString())
 	//Not sure if we should mark the results as alive or do nothing with the results
-	error, newNodes := kademlia.SendIterativeFindNode(randomID)
-	if error != nil {
-		for i := 0; i < len(newNodes); i++ {
-			kademlia.markAliveAndPossiblyPing(newNodes[i])
-		}
-	}
-
+	kademlia.SendIterativeFindNode(randomID)
 }
 
 func (kademlia *Kademlia) StartKademliaServer(address string) error {
@@ -312,7 +298,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 	//This function should return a list of k closest contacts to the specified node
 	shortList := make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
 	//have to do at least one call to kick it off
-	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, toFind, nil)
+	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_k, toFind, nil)
 
 	var closestPosition, farthestPosition int = 0, 0
 
@@ -468,7 +454,6 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 			}
 		}
 
-		printShortList(shortList, toFind, closestPosition, farthestPosition)
 		if triedAll {
 			log.Printf("Search terminated because tried all in short list")
 		}
@@ -479,13 +464,17 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 
 	returnContacts := make([]*Contact, len(shortList))
 	for i := 0; i < len(shortList); i++ {
+		//Not 100% sure we should be adding nodes from iterativeFindNode, but it seems to make routing work better
+		kademlia.markAliveAndPossiblyPing(shortList[i].contact)
 		returnContacts[i] = shortList[i].contact
+
 	}
 	return nil, nil, nil, returnContacts
 }
 
 func (kademlia *Kademlia) SendIterativeFindNode(nodeToFind ID) (error, []*Contact) {
 	error, _, _, contacts := kademlia.iterativeOperation(nodeToFind, iterativeFindNodeOperation)
+	kademlia.PrintRoutingTable()
 	return error, contacts
 
 }
@@ -610,4 +599,21 @@ func (kademlia *Kademlia) GetContactAddress(contact *Contact) string {
 		return fmt.Sprintf("%v:%v", contact.Host.String(), contact.Port)
 	}
 
+}
+
+func (kademlia *Kademlia) PrintRoutingTable() {
+	for i := 159; i >= 0; i-- {
+		if !kademlia.RoutingTable.kBuckets[i].IsEmpty() {
+			log.Printf("Bucket %v", i)
+			element := kademlia.RoutingTable.kBuckets[i].list.Front()
+			j := 1
+			for element != nil {
+				contact := element.Value.(*Contact)
+				log.Printf("  %v: %v", j, contact.NodeID.AsString())
+				j++
+				element = element.Next()
+			}
+
+		}
+	}
 }

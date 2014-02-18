@@ -106,7 +106,7 @@ func (kBucketTable *KBucketTable) markAliveInternal(request markAliveRequest) {
 	distanceBucket := kBucketTable.SelfContact.NodeID.DistanceBucket(request.contact.NodeID)
 	if distanceBucket != -1 {
 		kBucket := kBucketTable.kBuckets[distanceBucket]
-		log.Printf("Marking node in bucket %v as alive", distanceBucket)
+		log.Printf("Marking node %v in bucket %v as alive", request.contact.NodeID.AsString(), distanceBucket)
 		if kBucket.AddOrMoveToTail(request.contact) {
 			//Could add or already in table
 			if kBucket.pending != nil && kBucket.GetHead().Equals(request.contact) {
@@ -182,7 +182,7 @@ func (kBucketTable *KBucketTable) findKClosestNodesInternal(request findKClosest
 	kClosest := make([]*Contact, 0, request.k)
 
 	kClosest = insertIntoClosestSoFar(kClosest, kBucketTable.SelfContact, request.closestTo, request.exclude)
-	for i := 0; i < len(kBucketTable.kBuckets); i++ {
+	for i := 0; i < const_B; i++ {
 		kBucketList := kBucketTable.kBuckets[i].list
 		element := kBucketList.Front()
 		for element != nil {
@@ -248,12 +248,8 @@ func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestT
 			//Insert toInsert at position i
 
 			if len(closestSoFar) < cap(closestSoFar) {
-				log.Printf("Exapanding capacity from %v to %v", len(closestSoFar), len(closestSoFar)+1)
 				closestSoFar = closestSoFar[0 : len(closestSoFar)+1]
-			} else {
-				log.Printf("ClosestSoFar Full")
 			}
-			log.Printf("len %v cap %v min %v", len(closestSoFar), cap(closestSoFar), intMin(len(closestSoFar)-1, cap(closestSoFar)-2))
 			for j := len(closestSoFar) - 2; j >= i; j-- {
 				closestSoFar[j+1] = closestSoFar[j]
 			}
