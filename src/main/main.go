@@ -124,12 +124,12 @@ func main() {
 
 		case "iterativeFindNode":
 			if len(command) < 2 {
-				log.Printf("Error in command \"find_node\": command must be of the form \"find_node nodeID\"")
+				log.Printf("Error in command \"iterativeFindNode\": command must be of the form \"iterativeFindNode nodeID\"")
 				continue
 			}
 			nodeID, error := kademlia.FromString(command[1])
 			if error != nil {
-				log.Printf("Error in command \"find_node\": nodeID: %v", error)
+				log.Printf("Error in command \"iterativeFindNode\": nodeID: %v", error)
 				continue
 			}
 
@@ -155,7 +155,40 @@ func main() {
 			fmt.Printf("%v\n", foundIDs)
 
 		case "iterativeFindValue":
-			log.Printf("Not yet implemented")
+			if len(command) < 2 {
+				log.Printf("Error in command \"iterativeFindValue\": command must be of the form \"iterativeFindValue key\"")
+				continue
+			}
+			key, error := kademlia.FromString(command[1])
+			if error != nil {
+				log.Printf("Error in command \"iterativeFindValue\": key: %v", error)
+				continue
+			}
+
+			log.Printf("Finding value with key %v", key.AsString())
+
+			error, contactThatFoundValue, foundValue, foundContacts := kademliaServer.SendIterativeFindValue(key)
+			if error != nil {
+				log.Printf("%v", error)
+				fmt.Printf("ERR\n")
+				continue
+			}
+			if foundValue != nil {
+				log.Printf("Found value: ")
+				fmt.Printf("%v %v\n", contactThatFoundValue.NodeID.AsString(), string(foundValue))
+			} else {
+				foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+
+				log.Printf("No value, but NodeIDs found: ")
+
+				for i := 0; i < len(foundContacts); i++ {
+					foundIDs[i] = foundContacts[i].NodeID
+
+					log.Printf("%v", foundIDs[i].AsString())
+				}
+
+				fmt.Printf("%v\n", foundIDs)
+			}
 
 		case "ping":
 			if len(command) < 2 {
