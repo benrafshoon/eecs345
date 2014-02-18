@@ -5,6 +5,7 @@ package kademlia
 import (
 	"encoding/hex"
 	"errors"
+	//"log"
 	"math/rand"
 )
 
@@ -144,8 +145,10 @@ func (id ID) DistanceBucket(otherID ID) int {
 }
 
 func (id ID) RandomIDInBucket(bucket int) ID {
-	//159 implies all but msb changed
-	//0 implies none changed
+	//159 (0) implies msb (index 159) is opposite self
+	//158 (1) implies msb is same, 2nd msb is opposite
+	//1 (158) implies all but 2nd (index 1) lsb and lsb (index 0) is same as self, 2nd lsb is opposite, 1st is random
+	//0 (159) implies all but lsb (index 0)is same as self
 
 	randomID := NewRandomID()
 	var result ID
@@ -153,14 +156,31 @@ func (id ID) RandomIDInBucket(bucket int) ID {
 	for byteI := 0; byteI < IDBytes; byteI++ {
 		toShift := bucket - (19-byteI)*8
 		if toShift < 0 {
-			toShift = 0
+			//self
+			result[byteI] = id[byteI]
 		} else if toShift >= 8 {
-			toShift = 8
+			//random
+			result[byteI] = randomID[byteI]
+		} else {
+
+			oppositeBit := uint8(toShift) //at 159, this is 7, at 158, this is 6, at 0 this is 0
+
+			oppositeByte := id[byteI]
+			oppositeByte = oppositeByte & (0x1 << oppositeBit) //Isolate bit
+			oppositeByte = oppositeByte ^ (0x1 << oppositeBit) //Flip bit
+
+			//Lower bits are random
+			randomByte := randomID[byteI]
+			randomByte = randomByte & ^(0xFF << oppositeBit)
+
+			//Upper bits are self
+			selfByte := id[byteI]
+			selfByte = selfByte & (0xFF << (oppositeBit + 1))
+
+			//log.Printf("byte %v %b bit %v, opposite %b, random %b, self %b", byteI, id[byteI], toShift, oppositeByte, randomByte, selfByte)
+			result[byteI] = selfByte | randomByte | oppositeByte
 		}
-		mask := uint8(0xFF) << uint8(toShift)
-		result[byteI] = uint8(0)
-		result[byteI] = result[byteI] | (mask & id[byteI])        //High order bits are the non-random ones
-		result[byteI] = result[byteI] | (^mask & randomID[byteI]) //Low order bits are the random ones
+
 	}
 	return result
 }
