@@ -74,7 +74,7 @@ func main() {
 		command := strings.Split(input, " ")
 		switch command[0] {
 		case "whoami":
-			fmt.Printf("%v\n Node ID: %v\n", kademliaServer.GetNodeID().AsString(), kademliaServer.GetNodeID())
+			fmt.Printf("%v\n", kademliaServer.GetNodeID().AsString())
 		case "local_find_value":
 			if len(command) < 2 {
 				fmt.Printf("Error in command \"local_find_value\": must enter key, command must be of the form \"local_find_value key\"\n")
@@ -137,7 +137,7 @@ func main() {
 				fmt.Printf("ERR\n")
 				continue
 			}
-			fmt.Printf("%v\n", finalContact.NodeID)
+			fmt.Printf("%v\n", finalContact.NodeID.AsString())
 
 		case "iterativeFindNode":
 			if len(command) < 2 {
@@ -159,14 +159,12 @@ func main() {
 				continue
 			}
 
-			foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+			foundIDs := make([]string, len(foundContacts), len(foundContacts))
 
 			log.Printf("NodeIDs found: ")
 
 			for i := 0; i < len(foundContacts); i++ {
-				foundIDs[i] = foundContacts[i].NodeID
-
-				log.Printf("%v", foundIDs[i].AsString())
+				foundIDs[i] = foundContacts[i].NodeID.AsString()
 			}
 
 			fmt.Printf("%v\n", foundIDs)
@@ -184,7 +182,7 @@ func main() {
 
 			log.Printf("Finding value with key %v", key.AsString())
 
-			error, contactThatFoundValue, foundValue, foundContacts := kademliaServer.SendIterativeFindValue(key)
+			error, contactThatFoundValue, foundValue, _ := kademliaServer.SendIterativeFindValue(key)
 			if error != nil {
 				log.Printf("%v", error)
 				fmt.Printf("ERR\n")
@@ -194,17 +192,7 @@ func main() {
 				log.Printf("Found value: ")
 				fmt.Printf("%v %v\n", contactThatFoundValue.NodeID.AsString(), string(foundValue))
 			} else {
-				foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
-
-				log.Printf("No value, but NodeIDs found: ")
-
-				for i := 0; i < len(foundContacts); i++ {
-					foundIDs[i] = foundContacts[i].NodeID
-
-					log.Printf("%v", foundIDs[i].AsString())
-				}
-
-				fmt.Printf("%v\n", foundIDs)
+				fmt.Printf("ERR\n")
 			}
 
 		case "ping":
@@ -217,6 +205,7 @@ func main() {
 				_, error := kademliaServer.SendPing(firstContact)
 				if error != nil {
 					log.Println(error)
+					fmt.Printf("ERR\n")
 				}
 			} else {
 				//ping nodeID
@@ -301,14 +290,12 @@ func main() {
 				continue
 			}
 
-			foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+			foundIDs := make([]string, len(foundContacts), len(foundContacts))
 
 			log.Printf("NodeIDs found: ")
 
 			for i := 0; i < len(foundContacts); i++ {
-				foundIDs[i] = foundContacts[i].NodeID
-
-				log.Printf("%v", foundIDs[i].AsString())
+				foundIDs[i] = foundContacts[i].NodeID.AsString()
 			}
 
 			fmt.Printf("%v\n", foundIDs)
@@ -329,7 +316,7 @@ func main() {
 				fmt.Printf("Error in command \"find_value\": key: %v\n", error)
 				continue
 			}
-			log.Printf("Finding value with key %v from node %v", key.AsString(), nodeID.AsString())
+			log.Printf("Finding value with key %v from node %v", key, nodeID.AsString())
 
 			hasContact, _, contact := kademliaServer.RoutingTable.LookupContactByNodeID(nodeID)
 			if !hasContact {
@@ -344,16 +331,14 @@ func main() {
 			}
 			if foundValue != nil {
 				log.Printf("Found value: ")
-				fmt.Printf("%v %v\n", nodeID, string(foundValue))
+				fmt.Printf("%v %v\n", nodeID.AsString(), string(foundValue))
 			} else {
-				foundIDs := make([]kademlia.ID, len(foundContacts), len(foundContacts))
+				foundIDs := make([]string, len(foundContacts), len(foundContacts))
 
 				log.Printf("No value, but NodeIDs found: ")
 
 				for i := 0; i < len(foundContacts); i++ {
-					foundIDs[i] = foundContacts[i].NodeID
-
-					log.Printf("%v", foundIDs[i].AsString())
+					foundIDs[i] = foundContacts[i].NodeID.AsString()
 				}
 
 				fmt.Printf("%v\n", foundIDs)
