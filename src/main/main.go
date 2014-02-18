@@ -232,6 +232,7 @@ func main() {
 				if !hasContact {
 					log.Printf("Contact not found")
 					fmt.Printf("ERR\n")
+					continue
 				}
 				if isSelf {
 					log.Printf("Self contact")

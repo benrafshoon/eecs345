@@ -312,19 +312,13 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 	//This function should return a list of k closest contacts to the specified node
 	shortList := make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
 	//have to do at least one call to kick it off
-	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, toFind, kademlia.RoutingTable.SelfContact.NodeID)
-
-	if len(foundContacts) <= 0 {
-		log.Printf("No initial nodes found")
-		return nil, nil, nil, foundContacts
-
-	}
+	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_alpha, toFind, nil)
 
 	var closestPosition, farthestPosition int = 0, 0
 
 	for i := 0; i < len(foundContacts); i++ {
 		newContact := new(IterativeContact) //convert them to this data struct
-		newContact.checked = false
+		newContact.checked = foundContacts[i].Equals(kademlia.RoutingTable.SelfContact)
 		newContact.contact = foundContacts[i]
 		shortList = shortList[0 : i+1]
 		shortList[i] = newContact
@@ -504,12 +498,6 @@ func (kademlia *Kademlia) SendIterativeStore(key ID, value []byte) (*Contact, er
 	error, contacts := kademlia.SendIterativeFindNode(key)
 	if error != nil {
 		return nil, error
-	}
-
-	//Right now, iterative find node never returns self, so its possible contacts will be empty
-	if len(contacts) == 0 {
-		contacts = make([]*Contact, 1, 1)
-		contacts[0] = kademlia.RoutingTable.SelfContact
 	}
 
 	for i := 0; i < len(contacts); i++ {

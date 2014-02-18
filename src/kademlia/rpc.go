@@ -145,7 +145,7 @@ func (k *Kademlia) FindNode(req FindNodeRequest, res *FindNodeResult) error {
 	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 	log.Printf("  Node ID To Find: %v\n", req.NodeID.AsString())
 
-	contacts := k.RoutingTable.FindKClosestNodes(const_k, req.NodeID, req.Sender.NodeID)
+	contacts := k.RoutingTable.FindKClosestNodes(const_k, req.NodeID, &req.Sender)
 	log.Printf("  Responding with %v nodes\n", len(contacts))
 	for i := 0; i < len(contacts); i++ {
 		log.Printf("  %v: %v\n", i, contacts[i].NodeID.AsString())
@@ -190,7 +190,7 @@ func (k *Kademlia) FindValue(req FindValueRequest, res *FindValueResult) error {
 	res.Value = k.Data.RetrieveValue(req.Key)
 	if res.Value == nil {
 		log.Printf("   Could not find value with that key, returning k closest nodes instead\n")
-		contacts := k.RoutingTable.FindKClosestNodes(const_k, req.Key, req.Sender.NodeID)
+		contacts := k.RoutingTable.FindKClosestNodes(const_k, req.Key, &req.Sender)
 
 		log.Printf("  Responding with %v nodes\n", len(contacts))
 		for i := 0; i < len(contacts); i++ {

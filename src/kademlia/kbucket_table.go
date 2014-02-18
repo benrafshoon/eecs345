@@ -47,7 +47,7 @@ func (kBucketTable *KBucketTable) MarkDead(contact *Contact) {
 }
 
 //Thread-safe
-func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude ID) []*Contact {
+func (kBucketTable *KBucketTable) FindKClosestNodes(k int, closestTo ID, exclude *Contact) []*Contact {
 	log.Printf("Sending FindKClosestNodes request")
 	request := findKClosestNodesRequest{k, closestTo, exclude, make(chan findKClosestNodesResult)}
 	kBucketTable.requests <- request
@@ -163,7 +163,7 @@ func (kBucketTable *KBucketTable) markDeadInternal(request markDeadRequest) {
 type findKClosestNodesRequest struct {
 	k         int
 	closestTo ID
-	exclude   ID
+	exclude   *Contact
 	result    chan findKClosestNodesResult
 }
 
@@ -238,8 +238,8 @@ func intMin(a int, b int) int {
 }
 
 //Helper function
-func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestTo ID, exclude ID) []*Contact {
-	if toInsert.NodeID.Equals(exclude) {
+func insertIntoClosestSoFar(closestSoFar []*Contact, toInsert *Contact, closestTo ID, exclude *Contact) []*Contact {
+	if exclude != nil && toInsert.Equals(exclude) {
 		return closestSoFar
 	}
 
