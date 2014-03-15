@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	//"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -20,7 +20,7 @@ func main() {
 	// By default, Go seeds its RNG with 1. This would cause every program to
 	// generate the same sequence of IDs.
 	rand.Seed(time.Now().UnixNano())
-	log.SetOutput(ioutil.Discard)
+	//log.SetOutput(ioutil.Discard)
 	// Get the bind and connect connection strings from command-line arguments.
 	flag.Parse()
 	args := flag.Args()

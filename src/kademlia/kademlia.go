@@ -26,11 +26,6 @@ type Kademlia struct {
 	Data         *KeyValueStore
 }
 
-type IterativeContact struct {
-	contact *Contact
-	checked bool
-}
-
 func NewKademlia() *Kademlia {
 	kademlia := new(Kademlia)
 	kademlia.RoutingTable = NewKBucketTable()
@@ -251,6 +246,115 @@ func (kademlia *Kademlia) SendStore(contact *Contact, key ID, value []byte) erro
 
 }
 
+type IterativeContact struct {
+	contact *Contact
+	checked bool
+}
+
+type ShortList struct {
+	list          []*IterativeContact
+	closestIndex  int
+	farthestIndex int
+	toFind        ID
+}
+
+func newShortList(toFind ID) *ShortList {
+	shortList := new(ShortList)
+	shortList.toFind = toFind
+	shortList.list = make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
+	shortList.closestIndex = -1
+	shortList.farthestIndex = -1
+	return shortList
+}
+
+func (s *ShortList) closestDistance() int {
+	return s.list[s.closestIndex].contact.NodeID.DistanceBucket(s.toFind)
+}
+
+func (s *ShortList) farthestDistance() int {
+	return s.list[s.farthestIndex].contact.NodeID.DistanceBucket(s.toFind)
+}
+
+func (s *ShortList) insert(toInsert *Contact) {
+	distance := toInsert.NodeID.DistanceBucket(s.toFind)
+
+	if len(s.list) != cap(s.list) { //we aren't at capacity
+		newContact := new(IterativeContact) //convert them to this data struct
+		newContact.checked = false
+		newContact.contact = toInsert
+
+		s.list = s.list[0 : len(s.list)+1]
+		s.list[len(s.list)-1] = newContact
+
+		if s.farthestIndex == -1 || distance > s.farthestDistance() {
+			s.farthestIndex = len(s.list) - 1
+		} else if s.closestIndex == -1 || distance < s.closestDistance() {
+			s.closestIndex = len(s.list) - 1
+		}
+
+	} else if distance < s.farthestDistance() { //we have no room so we only want to add things that are closer
+		newContact := new(IterativeContact) //convert them to this data struct
+		newContact.checked = false
+		newContact.contact = toInsert
+		s.list[s.farthestIndex] = newContact //kick out the furthest thing
+		if s.closestIndex == -1 || distance < s.closestDistance() {
+			s.closestIndex = s.farthestIndex
+		}
+		s.farthestIndex = 0
+		for k := 0; k < len(s.list); k++ {
+			distance = s.list[k].contact.NodeID.DistanceBucket(s.toFind)
+			if distance > s.farthestDistance() {
+				s.farthestIndex = k
+			}
+		}
+	}
+}
+
+func (s *ShortList) contains(contact *Contact) bool {
+	for i := 0; i < len(s.list); i++ {
+		if contact.Equals(s.list[i].contact) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *ShortList) delete(toDelete *Contact) {
+	for i := 0; i < len(s.list); i++ {
+		if s.list[i].contact.Equals(toDelete) {
+			for j := i; j < len(s.list)-1; j++ {
+				s.list[j+1] = s.list[j]
+			}
+			s.list = s.list[0 : len(s.list)-1]
+		}
+	}
+}
+
+func (s *ShortList) closestToToFind() *Contact {
+	var closest *Contact = nil
+	closestDistance := const_B
+
+	for i := 0; i < len(s.list); i++ {
+		currentDistance := s.list[i].contact.NodeID.DistanceBucket(s.toFind)
+		if currentDistance < closestDistance {
+			closestDistance = currentDistance
+			closest = s.list[i].contact
+		}
+	}
+	return closest
+}
+
+func (s *ShortList) triedAll() bool {
+	triedAll := true
+	for i := 0; i < len(s.list); i++ {
+		if s.list[i].checked == false {
+			triedAll = false
+			break
+		}
+	}
+	return triedAll
+}
+
 func printShortList(shortList []*IterativeContact, nodeToFind ID, closestIndex int, furthestIndex int) {
 	log.Printf("Short list: searching for nodes near %v\n", nodeToFind.AsString())
 	for i := 0; i < len(shortList); i++ {
@@ -276,41 +380,6 @@ func printShortList(shortList []*IterativeContact, nodeToFind ID, closestIndex i
 	}
 }
 
-func shortListContains(shortList []*IterativeContact, contact *Contact) bool {
-	for i := 0; i < len(shortList); i++ {
-		if contact.Equals(shortList[i].contact) {
-			return true
-		}
-	}
-	return false
-}
-
-func shortListDelete(shortList []*IterativeContact, toDelete *Contact) []*IterativeContact {
-	for i := 0; i < len(shortList); i++ {
-		if shortList[i].contact.Equals(toDelete) {
-			for j := i; j < len(shortList)-1; j++ {
-				shortList[j+1] = shortList[j]
-			}
-			return shortList[0 : len(shortList)-1]
-		}
-	}
-	return shortList
-}
-
-func shortListClosestTo(shortList []*IterativeContact, closestTo ID) *Contact {
-	var closest *Contact = nil
-	closestDistance := const_B
-
-	for i := 0; i < len(shortList); i++ {
-		currentDistance := shortList[i].contact.NodeID.DistanceBucket(closestTo)
-		if currentDistance < closestDistance {
-			closestDistance = currentDistance
-			closest = shortList[i].contact
-		}
-	}
-	return closest
-}
-
 const iterativeFindNodeOperation = "IterativeFindNodeOperation"
 const iterativeFindValueOperation = "IterativeFindValueOperation"
 
@@ -332,27 +401,12 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 	}
 
 	//This function should return a list of k closest contacts to the specified node
-	shortList := make([]*IterativeContact, 0, const_k) //slice - array with 0 things now and a capacity of const_k
+	shortList := newShortList(toFind)
 	//have to do at least one call to kick it off
 	foundContacts := kademlia.RoutingTable.FindKClosestNodes(const_k, toFind, nil)
 
-	var closestPosition, farthestPosition int = 0, 0
-
 	for i := 0; i < len(foundContacts); i++ {
-		newContact := new(IterativeContact) //convert them to this data struct
-		newContact.checked = foundContacts[i].Equals(kademlia.RoutingTable.SelfContact)
-		newContact.contact = foundContacts[i]
-		shortList = shortList[0 : i+1]
-		shortList[i] = newContact
-		distance := foundContacts[i].NodeID.DistanceBucket(toFind)
-		closestDistance := shortList[closestPosition].contact.NodeID.DistanceBucket(toFind)
-		farthestDistance := shortList[farthestPosition].contact.NodeID.DistanceBucket(toFind)
-		if distance < closestDistance {
-			closestPosition = i
-		}
-		if distance > farthestDistance {
-			farthestPosition = i
-		}
+		shortList.insert(foundContacts[i])
 	}
 
 	nothingCloser := false
@@ -368,10 +422,10 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 		timer := time.NewTimer(timeout)                                           //create a new timer
 		for i := 0; i < const_alpha; i++ {
 			//let's pick the first three things that haven't been checked
-			for j := 0; j < len(shortList); j++ {
-				if shortList[j].checked == false {
-					shortList[j].checked = true
-					log.Printf("Finding node %v", shortList[j].contact.NodeID.AsString())
+			for j := 0; j < len(shortList.list); j++ {
+				if shortList.list[j].checked == false {
+					shortList.list[j].checked = true
+					log.Printf("Finding node %v", shortList.list[j].contact.NodeID.AsString())
 					//worrying about the address later
 
 					go func(toContact *Contact) { //send out the separate threads
@@ -390,16 +444,14 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 						} else {
 							iterativeStepResultChannel <- iterativeStepResult{Contact: toContact, FoundValue: nil, FoundContacts: nil}
 						}
-					}(shortList[j].contact)
+					}(shortList.list[j].contact)
 					//Capture shortList[j] in argument because j changes
 					numResponsesSent++
 					break
 				}
 			}
 		}
-		log.Printf("Looking at the closestPosition:%v", closestPosition)
-		closestDistance := shortList[closestPosition].contact.NodeID.DistanceBucket(toFind)
-		farthestDistance := shortList[farthestPosition].contact.NodeID.DistanceBucket(toFind)
+
 		//Collect everything
 		nothingCloser = true //true until proven guilty
 
@@ -412,8 +464,8 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 			case result := <-iterativeStepResultChannel:
 				if result.FoundValue != nil {
 					log.Printf("   Found the value")
-					shortList = shortListDelete(shortList, result.Contact)
-					closest := shortListClosestTo(shortList, toFind) //This could be nil if the shortList only had one contact
+					shortList.delete(result.Contact)
+					closest := shortList.closestToToFind() //This could be nil if the shortList only had one contact
 					if closest != nil && closest.NodeID.DistanceBucket(toFind) < result.Contact.NodeID.DistanceBucket(toFind) {
 						log.Printf("Node %v is closer than node that found value %v", closest.NodeID.AsString, result.Contact.NodeID.AsString())
 						log.Printf("Storing key value pair in closer node")
@@ -425,52 +477,20 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 					for j := 0; j < len(result.FoundContacts); j++ { //look through every item we found
 						log.Printf("   Adding node %v", result.FoundContacts[j].NodeID.AsString())
 						//Ignore nodes we already have in the shortlist
-						if shortListContains(shortList, result.FoundContacts[j]) {
+						if shortList.contains(result.FoundContacts[j]) {
 							log.Printf("   Node already in shortlist")
-							continue
-						}
-
-						distance := result.FoundContacts[j].NodeID.DistanceBucket(toFind)
-
-						if len(shortList) != cap(shortList) { //we aren't at capacity
-							newContact := new(IterativeContact) //convert them to this data struct
-							newContact.checked = false
-							newContact.contact = result.FoundContacts[j]
-
-							shortList = shortList[0 : len(shortList)+1]
-							shortList[len(shortList)-1] = newContact
-
-							if distance > farthestDistance {
-								farthestPosition = len(shortList) - 1
-							} else if distance < closestDistance {
-								closestPosition = len(shortList) - 1
+						} else {
+							shortList.insert(result.FoundContacts[j])
+							//If the new closest index is the one we just inserted
+							if shortList.list[shortList.closestIndex].contact.Equals(result.FoundContacts[j]) {
 								nothingCloser = false
-							}
-
-						} else if distance < farthestDistance { //we have no room so we only want to add things that are closer
-							newContact := new(IterativeContact) //convert them to this data struct
-							newContact.checked = false
-							newContact.contact = result.FoundContacts[j]
-							shortList[farthestPosition] = newContact //kick out the furthest thing
-							if distance < closestDistance {
-								closestPosition = farthestPosition
-								nothingCloser = false
-							}
-							farthestDistance = 0
-							for k := 0; k < len(shortList); k++ {
-								distance = shortList[k].contact.NodeID.DistanceBucket(toFind)
-								farthestDistance = shortList[farthestPosition].contact.NodeID.DistanceBucket(toFind)
-								if distance > farthestDistance {
-									farthestDistance = k
-								}
 							}
 						}
 					}
 				} else {
 					log.Printf("Node dead, removing from shortlist")
-					shortList = shortListDelete(shortList, result.Contact)
+					shortList.delete(result.Contact)
 				}
-
 				numResponsesReceived++
 				if numResponsesReceived == numResponsesSent {
 					log.Printf("All responses received")
@@ -481,13 +501,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 			}
 		}
 
-		triedAll = true
-		for i := 0; i < len(shortList); i++ {
-			if shortList[i].checked == false {
-				triedAll = false
-				break
-			}
-		}
+		triedAll = shortList.triedAll()
 
 		if triedAll {
 			log.Printf("Search terminated because tried all in short list")
@@ -497,11 +511,11 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) (e
 		}
 	}
 
-	returnContacts := make([]*Contact, len(shortList))
-	for i := 0; i < len(shortList); i++ {
+	returnContacts := make([]*Contact, len(shortList.list))
+	for i := 0; i < len(shortList.list); i++ {
 		//Not 100% sure we should be adding nodes from iterativeFindNode, but it seems to make routing work better
-		kademlia.markAliveAndPossiblyPing(shortList[i].contact)
-		returnContacts[i] = shortList[i].contact
+		kademlia.markAliveAndPossiblyPing(shortList.list[i].contact)
+		returnContacts[i] = shortList.list[i].contact
 
 	}
 	return nil, nil, nil, returnContacts
