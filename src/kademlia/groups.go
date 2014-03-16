@@ -42,7 +42,7 @@ type CreateGroupRequest struct {
 }
 
 type CreateGroupResult struct {
-	MsgID
+	MsgID ID
 }
 
 //Similar to scribe create

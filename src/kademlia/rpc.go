@@ -208,21 +208,3 @@ func (k *Kademlia) FindValue(req FindValueRequest, res *FindValueResult) error {
 
 	return nil
 }
-
-//Similar to scribe create
-func (k *Kademlia) CreateGroup() error {
-	return nil
-}
-
-//Similar to scribe join
-func (k *Kademlia) AddPathToGroup() error {
-	return nil
-}
-
-func (k *Kademlia) BroadcastMessage() error {
-	return nil
-}
-
-func (k *Kademlia) LeaveGroup() error {
-	return nil
-}
