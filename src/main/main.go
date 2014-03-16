@@ -354,6 +354,20 @@ func main() {
 
 				fmt.Printf("%v\n", foundIDs)
 			}
+		case "create_group":
+			if len(command) < 2 {
+				fmt.Printf("Error in command \"create_group\": command must be of the form \"create_group group_name\"\n")
+				continue
+			}
+			groupName := command[1]
+			kademliaServer.SendCreateGroup(groupName)
+
+		case "join_group":
+
+		case "multicast_group":
+
+		case "leave_group":
+
 		default:
 			fmt.Printf("Unrecognized command: %s\n", command[0])
 		}

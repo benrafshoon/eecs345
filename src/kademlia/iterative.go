@@ -66,7 +66,8 @@ func (s *ShortList) insert(toInsert *Contact, foundBy *IterativeContact) {
 
 		if s.farthestIndex == -1 || distance > s.farthestDistance() {
 			s.farthestIndex = len(s.list) - 1
-		} else if s.closestIndex == -1 || distance < s.closestDistance() {
+		}
+		if s.closestIndex == -1 || distance < s.closestDistance() {
 			s.closestIndex = len(s.list) - 1
 		}
 
@@ -133,27 +134,27 @@ func (s *ShortList) triedAll() bool {
 	return triedAll
 }
 
-func printShortList(shortList []*IterativeContact, nodeToFind ID, closestIndex int, furthestIndex int) {
-	log.Printf("Short list: searching for nodes near %v\n", nodeToFind.AsString())
-	for i := 0; i < len(shortList); i++ {
+func (s *ShortList) print() {
+	log.Printf("Short list: searching for nodes near %v\n", s.toFind.AsString())
+	for i := 0; i < len(s.list); i++ {
 		line := fmt.Sprintf("  %v: ", i)
-		if shortList[i].checked {
+		if s.list[i].checked {
 			line = fmt.Sprintf("%v     Checked ", line)
 		} else {
 			line = fmt.Sprintf("%v NOT Checked ", line)
 		}
-		line = fmt.Sprintf("%vD%v ", line, nodeToFind.DistanceBucket(shortList[i].contact.NodeID))
-		if i == closestIndex {
+		line = fmt.Sprintf("%vD%v ", line, s.toFind.DistanceBucket(s.list[i].contact.NodeID))
+		if i == s.closestIndex {
 			line = fmt.Sprintf("%vC ", line)
 		} else {
 			line = fmt.Sprintf("%v  ", line)
 		}
-		if i == furthestIndex {
+		if i == s.farthestIndex {
 			line = fmt.Sprintf("%vF ", line)
 		} else {
 			line = fmt.Sprintf("%v  ", line)
 		}
-		line = fmt.Sprintf("%v%v\n", line, shortList[i].contact.NodeID.AsString())
+		line = fmt.Sprintf("%v%v\n", line, s.list[i].contact.NodeID.AsString())
 		log.Printf("%v", line)
 	}
 }
@@ -317,6 +318,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) it
 	}
 
 	returnValue.FoundContacts = returnContacts
+	shortList.print()
 	returnValue.Path = shortList.list[shortList.closestIndex].collectPath(kademlia.RoutingTable.SelfContact)
 	log.Printf("Path to closest found node")
 	current := returnValue.Path.Front()
