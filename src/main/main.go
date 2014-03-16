@@ -22,18 +22,29 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	//log.SetOutput(ioutil.Discard)
 	// Get the bind and connect connection strings from command-line arguments.
+
+	name := flag.String("name", "untitled", "Enter username")
+	testNodeIDString := flag.String("id", "", "Optionally specify the node ID for testing")
+	listenStr := flag.String("listen", "", "Enter ip address to listen on")
+	firstPeerStr := flag.String("first-peer", "", "Enter ip address of first peer")
+
 	flag.Parse()
-	args := flag.Args()
-	if len(args) < 2 {
-		log.Fatal("Must be invoked with at least two arguments!\n")
+
+	log.Printf(*name)
+
+	if *listenStr == "" {
+		fmt.Println("Must enter ip address to listen on")
+		return
 	}
-	listenStr := args[0]
-	firstPeerStr := args[1]
+
+	if *firstPeerStr == "" {
+		fmt.Println("Must enter ip address of first peer")
+	}
 
 	var kademliaServer *kademlia.Kademlia
 
-	if len(args) >= 3 {
-		testNodeID, error := kademlia.FromString(args[2])
+	if *testNodeIDString != "" {
+		testNodeID, error := kademlia.FromString(*testNodeIDString)
 		if error != nil {
 			log.Fatal("Error parsing test node ID: ", error)
 		}
@@ -43,13 +54,13 @@ func main() {
 		kademliaServer = kademlia.NewKademlia()
 	}
 
-	error := kademliaServer.StartKademliaServer(listenStr)
+	error := kademliaServer.StartKademliaServer(*listenStr)
 
 	if error != nil {
 		log.Fatal("Error starting kademlia server: ", error)
 	}
 
-	firstPeer, error := kademlia.NewContactFromAddressString(firstPeerStr)
+	firstPeer, error := kademlia.NewContactFromAddressString(*firstPeerStr)
 	if error != nil {
 		log.Fatal("Error parsing first contact ", error)
 	}
