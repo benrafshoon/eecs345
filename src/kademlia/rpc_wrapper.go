@@ -25,3 +25,19 @@ func (wrapper *KademliaRPCWrapper) FindNode(req FindNodeRequest, res *FindNodeRe
 func (wrapper *KademliaRPCWrapper) FindValue(req FindValueRequest, res *FindValueResult) error {
 	return wrapper.kademlia.FindValue(req, res)
 }
+
+func (wrapper *KademliaRPCWrapper) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) error {
+	return wrapper.kademlia.CreateGroup(req, res)
+}
+
+func (wrapper *KademliaRPCWrapper) AddPathToGroup(req AddPathToGroupRequest, res *AddPathToGroupResponse) error {
+	return wrapper.kademlia.AddPathToGroup(req, res)
+}
+
+func (wrapper *KademliaRPCWrapper) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastMessageResponse) error {
+	return wrapper.kademlia.BroadcastMessage(req, res)
+}
+
+func (wrapper *KademliaRPCWrapper) LeaveGroup(req LeaveGroupRequest, res *LeaveGroupResponse) error {
+	return wrapper.kademlia.LeaveGroup(req, res)
+}
