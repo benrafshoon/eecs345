@@ -24,7 +24,7 @@ const primitiveTimeout = 10 * time.Second
 type Kademlia struct {
 	RoutingTable *KBucketTable
 	Data         *KeyValueStore
-	Groups       map[ID]*Group
+	Groups       map[string]*Group
 }
 
 func NewKademlia() *Kademlia {
@@ -32,7 +32,7 @@ func NewKademlia() *Kademlia {
 	kademlia.RoutingTable = NewKBucketTable()
 	kademlia.RoutingTable.SelfContact.NodeID = NewRandomID()
 	kademlia.Data = NewKeyValueStore()
-	kademlia.Groups = make(map[ID]*Group)
+	kademlia.Groups = make(map[string]*Group)
 	return kademlia
 }
 

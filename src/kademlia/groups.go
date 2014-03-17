@@ -3,17 +3,19 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
+	"fmt"
 	"log"
 	"net/rpc"
 )
 
 type Group struct {
-	Name            string
-	GroupID         ID
-	RendezvousPoint *Contact
-	Parent          *Contact
-	Children        *list.List
-	Member          bool
+	Name              string
+	GroupID           ID
+	RendezvousPoint   *Contact
+	Parent            *Contact
+	Children          *list.List
+	Member            bool
+	IsRendezvousPoint bool
 }
 
 //Parent == nil implies RV point
@@ -34,34 +36,8 @@ func newGroup() *Group {
 	group.Children = list.New()
 	group.Member = false
 	group.RendezvousPoint = nil
+	group.IsRendezvousPoint = false
 	return group
-}
-
-//Returns the group, and whether the group is new (true) or if it already existed (false)
-func (k *Kademlia) AddGroupWithName(name string) (*Group, bool) {
-	namedGroupID := groupID(name)
-	if k.Groups[namedGroupID] == nil {
-		log.Printf("Creating new group")
-		group := newGroup()
-		group.Name = name
-		group.GroupID = namedGroupID
-		return group, true
-	} else {
-		log.Printf("Group already exists")
-		return k.Groups[namedGroupID], false
-	}
-}
-
-func (k *Kademlia) AddGroupWithGroupID(groupID ID) (*Group, bool) {
-	if k.Groups[groupID] == nil {
-		log.Printf("Creating new group")
-		group := newGroup()
-		group.GroupID = groupID
-		return group, true
-	} else {
-		log.Printf("Group already exists")
-		return k.Groups[groupID], false
-	}
 }
 
 func (g *Group) PrintGroup() {
@@ -70,15 +46,93 @@ func (g *Group) PrintGroup() {
 	} else {
 		log.Printf("Group %s", g.GroupID.AsString())
 	}
-	if g.Parent == nil {
-		log.Printf("        Rendezvous Point")
+	if g.Member {
+		log.Printf("        Member")
 	} else {
-		log.Printf("        Parent: %s", g.Parent.NodeID.AsString())
+		log.Printf("        Not member")
 	}
+	if g.IsRendezvousPoint {
+		log.Printf("        Is Rendezvous Point")
+	}
+	if g.RendezvousPoint != nil {
+		log.Printf("        Rendezvous Point: %s", g.RendezvousPoint.NodeID.AsString())
+	} else {
+		log.Printf("        Rendezvous Point Unknown")
+	}
+	if g.Parent != nil {
+		log.Printf("        Parent: %s", g.Parent.NodeID.AsString())
+	} else {
+		log.Printf("        Parent Unknown")
+	}
+
 	child := g.Children.Front()
 	for child != nil {
 		log.Printf("        Child: %s", child.Value.(*Contact).NodeID.AsString())
 		child = child.Next()
+	}
+}
+
+func (g *Group) RemoveChild(toRemove *Contact) bool {
+	current := g.Children.Front()
+	for current != nil {
+		child := current.Value.(*Contact)
+		if child.Equals(toRemove) {
+			g.Children.Remove(current)
+			return true
+		}
+		current = current.Next()
+	}
+	return false
+}
+
+//Primitive receives
+
+//Returns the group, and whether the group is new (true) or if it already existed (false)
+func (k *Kademlia) AddGroupWithName(name string) (*Group, bool) {
+	namedGroupID := groupID(name)
+	group, groupAlreadyAdded := k.Groups[namedGroupID.AsString()]
+	if !groupAlreadyAdded {
+		log.Printf("Creating new group named %s with id %s", name, namedGroupID.AsString())
+		group := newGroup()
+		group.Name = name
+		group.GroupID = namedGroupID
+		k.Groups[namedGroupID.AsString()] = group
+		return group, true
+	} else {
+		log.Printf("Group already exists")
+		return group, false
+	}
+}
+
+func (k *Kademlia) AddGroupWithGroupID(groupID ID) (*Group, bool) {
+	group, groupAlreadyAdded := k.Groups[groupID.AsString()]
+	if !groupAlreadyAdded {
+		log.Printf("Creating new group")
+		group := newGroup()
+		group.GroupID = groupID
+		k.Groups[groupID.AsString()] = group
+		return group, true
+	} else {
+		log.Printf("Group already exists")
+		return group, false
+	}
+}
+
+func (k *Kademlia) FindGroupWithGroupID(groupID ID) (bool, *Group) {
+	group, groupExists := k.Groups[groupID.AsString()]
+	if groupExists {
+		return true, group
+	} else {
+		return false, nil
+	}
+}
+
+func (k *Kademlia) FindGroupWithName(name string) (bool, *Group) {
+	group, groupExists := k.Groups[groupID(name).AsString()]
+	if groupExists {
+		return true, group
+	} else {
+		return false, nil
 	}
 }
 
@@ -94,34 +148,47 @@ type CreateGroupResult struct {
 
 //Similar to scribe create
 func (k *Kademlia) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) error {
-	if k.Groups[req.GroupID] == nil {
-		log.Printf("Create new group")
-		newGroup := newGroup()
-		newGroup.GroupID = req.GroupID
-		k.Groups[req.GroupID] = newGroup
-	} else {
-		log.Printf("Create existing group")
-	}
-	k.Groups[req.GroupID].PrintGroup()
+	group, _ := k.AddGroupWithGroupID(req.GroupID)
+	group.IsRendezvousPoint = true
+	group.RendezvousPoint = k.RoutingTable.SelfContact
+	group.Parent = k.RoutingTable.SelfContact
+	group.PrintGroup()
 	res.MsgID = req.MsgID
 	return nil
 }
 
 type AddPathToGroupRequest struct {
-	Sender  Contact
-	MsgID   ID
-	GroupID ID
-	Child   Contact
-	Parent  Contact
+	Sender    Contact
+	MsgID     ID
+	GroupID   ID
+	Child     Contact
+	HasParent bool
+	Parent    Contact
 }
 
 type AddPathToGroupResponse struct {
-	MsgID      ID
-	IsNewGroup bool
+	MsgID                           ID
+	AlreadyHasPathToRendezvousPoint bool
 }
 
 //Similar to scribe join
 func (k *Kademlia) AddPathToGroup(req AddPathToGroupRequest, res *AddPathToGroupResponse) error {
+	group, _ := k.AddGroupWithGroupID(req.GroupID)
+	log.Printf("Adding forwarding entry to group %s", group.GroupID.AsString())
+	group.Children.PushBack(req.Child)
+	if group.Parent == nil {
+		if req.HasParent {
+			group.Parent = &req.Parent
+			res.AlreadyHasPathToRendezvousPoint = false
+			log.Printf("  Adding parent %s - %i", req.Parent.NodeID.AsString(), req.Parent.NodeID.DistanceBucket(group.GroupID))
+		}
+	} else {
+		res.AlreadyHasPathToRendezvousPoint = true
+		log.Printf("  Existing parent %s - %i", group.Parent.NodeID.AsString(), group.Parent.NodeID.DistanceBucket(group.GroupID))
+	}
+	log.Printf("  New Child %s - %i", req.Child.NodeID.AsString(), req.Child.NodeID.DistanceBucket(group.GroupID))
+
+	res.MsgID = req.MsgID
 	return nil
 }
 
@@ -137,6 +204,31 @@ type BroadcastMessageResponse struct {
 }
 
 func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastMessageResponse) error {
+	foundGroup, group := k.FindGroupWithGroupID(req.GroupID)
+	if foundGroup {
+		if group.IsRendezvousPoint {
+			//RV point stuff done here
+		}
+		if req.Sender.Equals(group.Parent) {
+			log.Printf("Recevied broadcast message %s", req.Message)
+			if group.Member {
+				fmt.Println(req.Message)
+				//TODO: Send to main for formatting
+			}
+			current := group.Children.Front()
+			for current != nil {
+				child := current.Value.(*Contact)
+				k.SendBroadcastMessage(child, group, req.Message)
+				current = current.Next()
+			}
+
+		} else {
+			log.Printf("Received broadcast request from non-parent %s - %i", req.Sender.NodeID.AsString(), req.Sender.NodeID.DistanceBucket(group.GroupID))
+		}
+	} else {
+		log.Printf("Received broadcast message for group for which not a forwarder %s", req.GroupID)
+	}
+	res.MsgID = req.MsgID
 	return nil
 }
 
@@ -151,37 +243,200 @@ type LeaveGroupResponse struct {
 }
 
 func (k *Kademlia) LeaveGroup(req LeaveGroupRequest, res *LeaveGroupResponse) error {
+	log.Printf("Removing %s from group %s", req.Sender.NodeID.AsString(), req.GroupID.AsString())
+	didFindGroup, group := k.FindGroupWithGroupID(req.GroupID)
+	if didFindGroup {
+		wasInGroup := group.RemoveChild(&req.Sender)
+		if !wasInGroup {
+			log.Printf("Tried to remove child that was not in group")
+		}
+		//Only leave if a forwarder and have no children to forward to, or not receiving messages from the group (a member)
+		if group.Children.Len() == 0 && !group.Member {
+			k.SendLeaveGroup(k.RoutingTable.SelfContact, group)
+		}
+	}
 	return nil
 }
 
-func (k *Kademlia) SendCreateGroup(name string) {
-	group, isNewGroup := k.AddGroupWithName(name)
+//Primitive sends
+
+func (k *Kademlia) SendCreateGroup(group *Group) {
+	rvPoint := group.RendezvousPoint
+	log.Printf("Sending create group to %v\n", k.GetContactAddress(rvPoint))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(rvPoint))
+	if err != nil {
+		log.Printf("Connection error")
+		return
+	}
+
+	req := new(CreateGroupRequest)
+	req.Sender = *k.RoutingTable.SelfContact
+	req.MsgID = NewRandomID()
+	req.GroupID = group.GroupID
+	var res CreateGroupResult
+
+	err = client.Call("Kademlia.CreateGroup", req, &res)
+	if err != nil {
+		log.Printf("Error in remote node response")
+		return
+	}
+
+	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+
+	client.Close()
+}
+
+//Should return an error
+func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Contact, parent *Contact) bool {
+
+	log.Printf("Sending add path to group to %v\n", k.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
+	if err != nil {
+		log.Printf("Connection error")
+		return false
+	}
+
+	req := new(AddPathToGroupRequest)
+	req.Sender = *k.RoutingTable.SelfContact
+	req.MsgID = NewRandomID()
+	req.GroupID = group.GroupID
+	req.Child = *child
+	if parent == nil {
+		req.HasParent = false
+	} else {
+		req.HasParent = true
+		req.Parent = *parent
+	}
+	var res AddPathToGroupResponse
+
+	err = client.Call("Kademlia.AddPathToGroup", req, &res)
+	if err != nil {
+		log.Printf("Error in remote node response")
+		return false
+	}
+
+	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+
+	client.Close()
+	return res.AlreadyHasPathToRendezvousPoint
+}
+
+func (k *Kademlia) SendBroadcastMessage(contact *Contact, group *Group, message string) {
+	log.Printf("Sending broadcast message to group to %v\n", k.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
+	if err != nil {
+		log.Printf("Connection error")
+		return
+	}
+
+	req := new(BroadcastMessageRequest)
+	req.Sender = *k.RoutingTable.SelfContact
+	req.MsgID = NewRandomID()
+	req.GroupID = group.GroupID
+	req.Message = message
+	var res BroadcastMessageResponse
+
+	err = client.Call("Kademlia.BroadcastMessage", req, &res)
+	if err != nil {
+		log.Printf("Error in remote node response")
+		return
+	}
+
+	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+
+	client.Close()
+}
+
+func (k *Kademlia) SendLeaveGroup(contact *Contact, group *Group) {
+	log.Printf("Sending leave group to %v\n", k.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
+	if err != nil {
+		log.Printf("Connection error")
+		return
+	}
+
+	req := new(LeaveGroupRequest)
+	req.Sender = *k.RoutingTable.SelfContact
+	req.MsgID = NewRandomID()
+	req.GroupID = group.GroupID
+
+	var res LeaveGroupResponse
+
+	err = client.Call("Kademlia.LeaveGroup", req, &res)
+	if err != nil {
+		log.Printf("Error in remote node response")
+		return
+	}
+
+	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+
+	client.Close()
+}
+
+//Compound sends
+
+func (k *Kademlia) DoCreateGroup(groupName string) {
+	group, isNewGroup := k.AddGroupWithName(groupName)
 	if isNewGroup {
 		result := k.iterativeOperation(group.GroupID, iterativeFindNodeOperation)
-		closestNode := result.Path.Back().Value.(*Contact)
+		group.RendezvousPoint = result.Path.Back().Value.(*Contact)
+		k.SendCreateGroup(group)
+	}
+	group.PrintGroup()
+}
 
-		log.Printf("Sending create group to %v\n", k.GetContactAddress(closestNode))
-		client, err := rpc.DialHTTP("tcp", k.GetContactAddress(closestNode))
-		if err != nil {
-			log.Printf("Connection error")
-			return
+func (k *Kademlia) DoJoinGroup(groupName string) {
+	group, _ := k.AddGroupWithName(groupName)
+	group.Member = true
+	if group.IsRendezvousPoint || group.Parent != nil {
+		//We already have a path to the RV point
+		log.Printf("Already in group %s", groupName)
+	} else {
+		result := k.iterativeOperation(group.GroupID, iterativeFindNodeOperation)
+		//Assume path has at least one entry (self)
+		previous := result.Path.Front()
+		current := previous.Next() //1st in list is self, no need to do anything with that
+		completePath := false
+		for current != nil && !completePath {
+			next := current.Next()
+			var nextNodeInPath *Contact = nil
+			if next != nil {
+				nextNodeInPath = next.Value.(*Contact)
+			}
+			previousNodeInPath := previous.Value.(*Contact)
+			nodeInPath := current.Value.(*Contact)
+			if group.Parent == nil {
+				//If there is no parent, this will be filed on the first loop iteartion
+				//If there is already a parent, we will never reach this branch
+				group.Parent = nodeInPath
+			}
+			//Send request to current to add previous to children and next to parent
+			//If current already has a path to the rv point, completePath will become true and the loop will terminate
+			completePath = k.SendAddPathToGroup(group, nodeInPath, previousNodeInPath, nextNodeInPath)
+			previous = current
+			current = next
 		}
+	}
 
-		req := new(CreateGroupRequest)
-		req.Sender = *k.RoutingTable.SelfContact
-		req.MsgID = NewRandomID()
-		req.GroupID = group.GroupID
-		var res CreateGroupResult
+}
 
-		err = client.Call("Kademlia.CreateGroup", req, &res)
-		if err != nil {
-			log.Printf("Error in remote node response")
-			return
+func (k *Kademlia) DoBroadcastMessage(groupName string, message string) {
+	didFindGroup, group := k.FindGroupWithName(groupName)
+	if didFindGroup && group.RendezvousPoint != nil {
+		k.SendBroadcastMessage(group.RendezvousPoint, group, message)
+	}
+}
+
+func (k *Kademlia) DoLeaveGroup(groupName string) {
+	didFindGroup, group := k.FindGroupWithName(groupName)
+	if didFindGroup {
+		group.Member = false
+		if !group.IsRendezvousPoint && group.Children.Len() == 0 {
+			k.SendLeaveGroup(group.Parent, group)
 		}
-
-		log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
-		log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
-
-		client.Close()
 	}
 }

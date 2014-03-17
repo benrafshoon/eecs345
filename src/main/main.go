@@ -360,7 +360,7 @@ func main() {
 				continue
 			}
 			groupName := command[1]
-			kademliaServer.SendCreateGroup(groupName)
+			kademliaServer.DoCreateGroup(groupName)
 
 		case "join_group":
 
