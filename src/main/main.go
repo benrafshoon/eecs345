@@ -383,6 +383,12 @@ func main() {
 			}
 
 		case "leave_group":
+			if len(command) < 2 {
+				fmt.Printf("Error in command \"leave_group\": command must be of the form \"leave_group group_name\"\n")
+				continue
+			}
+			groupName := command[1]
+			kademliaServer.DoLeaveGroup(groupName)
 
 		default:
 			fmt.Printf("Unrecognized command: %s\n", command[0])

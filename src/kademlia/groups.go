@@ -291,8 +291,8 @@ func (k *Kademlia) SendCreateGroup(group *Group) {
 		return
 	}
 
-	log.Printf("Received response to CreateGroup request from %v:%v\n", req.Sender.Host, req.Sender.Port)
-	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+	log.Printf("Received response to CreateGroup request from %v:%v\n", rvPoint.Host, rvPoint.Port)
+	log.Printf("          Node ID: %v\n", rvPoint.NodeID.AsString())
 
 	client.Close()
 }
@@ -327,8 +327,8 @@ func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Con
 		return false
 	}
 
-	log.Printf("Received response to AddPathToGroup request from %v:%v\n", req.Sender.Host, req.Sender.Port)
-	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+	log.Printf("Received response to AddPathToGroup request from %v:%v\n", contact.Host, contact.Port)
+	log.Printf("          Node ID: %v\n", contact.NodeID.AsString())
 
 	client.Close()
 	return res.AlreadyHasPathToRendezvousPoint
@@ -355,8 +355,8 @@ func (k *Kademlia) SendBroadcastMessage(contact *Contact, group *Group, message 
 		return
 	}
 
-	log.Printf("Received response to BroadcastMessage from %v:%v\n", req.Sender.Host, req.Sender.Port)
-	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
+	log.Printf("Received response to BroadcastMessage from %v:%v\n", contact.Host, contact.Port)
+	log.Printf("          Node ID: %v\n", contact.NodeID.AsString())
 
 	client.Close()
 }
@@ -455,6 +455,9 @@ func (k *Kademlia) DoLeaveGroup(groupName string) {
 		group.Member = false
 		if !group.IsRendezvousPoint && group.Children.Len() == 0 {
 			k.SendLeaveGroup(group.Parent, group)
+			group.Parent = nil //Delete path to parent since parent no longer sends messages to self after sending LeaveGroup request
 		}
+		group.PrintGroup()
 	}
+
 }
