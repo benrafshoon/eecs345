@@ -363,8 +363,24 @@ func main() {
 			kademliaServer.DoCreateGroup(groupName)
 
 		case "join_group":
+			if len(command) < 2 {
+				fmt.Printf("Error in command \"join_group\": command must be of the form \"join_group group_name\"\n")
+				continue
+			}
+			groupName := command[1]
+			kademliaServer.DoJoinGroup(groupName)
 
-		case "multicast_group":
+		case "send_message":
+			if len(command) < 3 {
+				fmt.Printf("Error in command \"send_message\": command must be of the form \"send_message group_name message\"\n")
+				continue
+			}
+			groupName := command[1]
+			message := strings.SplitAfterN(input, " ", 3)[2]
+			groupExists := kademliaServer.DoBroadcastMessage(groupName, message)
+			if !groupExists {
+				fmt.Printf("Error in command \"send_message\": not a member of group %s", groupName)
+			}
 
 		case "leave_group":
 

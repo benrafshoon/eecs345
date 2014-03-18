@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"time"
 )
 
 type Group struct {
@@ -158,12 +159,13 @@ func (k *Kademlia) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) e
 }
 
 type AddPathToGroupRequest struct {
-	Sender    Contact
-	MsgID     ID
-	GroupID   ID
-	Child     Contact
-	HasParent bool
-	Parent    Contact
+	Sender          Contact
+	MsgID           ID
+	GroupID         ID
+	Child           Contact
+	HasParent       bool
+	Parent          Contact
+	RendezvousPoint Contact
 }
 
 type AddPathToGroupResponse struct {
@@ -175,28 +177,37 @@ type AddPathToGroupResponse struct {
 func (k *Kademlia) AddPathToGroup(req AddPathToGroupRequest, res *AddPathToGroupResponse) error {
 	group, _ := k.AddGroupWithGroupID(req.GroupID)
 	log.Printf("Adding forwarding entry to group %s", group.GroupID.AsString())
-	group.Children.PushBack(req.Child)
+	group.Children.PushBack(&req.Child)
+	group.RendezvousPoint = &req.RendezvousPoint
 	if group.Parent == nil {
 		if req.HasParent {
 			group.Parent = &req.Parent
 			res.AlreadyHasPathToRendezvousPoint = false
-			log.Printf("  Adding parent %s - %i", req.Parent.NodeID.AsString(), req.Parent.NodeID.DistanceBucket(group.GroupID))
+			log.Printf("  Adding parent %s - %d", req.Parent.NodeID.AsString(), req.Parent.NodeID.DistanceBucket(group.GroupID))
 		}
 	} else {
 		res.AlreadyHasPathToRendezvousPoint = true
-		log.Printf("  Existing parent %s - %i", group.Parent.NodeID.AsString(), group.Parent.NodeID.DistanceBucket(group.GroupID))
+		log.Printf("  Existing parent %s - %d", group.Parent.NodeID.AsString(), group.Parent.NodeID.DistanceBucket(group.GroupID))
 	}
-	log.Printf("  New Child %s - %i", req.Child.NodeID.AsString(), req.Child.NodeID.DistanceBucket(group.GroupID))
+	log.Printf("  New Child %s - %d", req.Child.NodeID.AsString(), req.Child.NodeID.DistanceBucket(group.GroupID))
 
 	res.MsgID = req.MsgID
 	return nil
+}
+
+type Message struct {
+	Message  string
+	Username string
+	Time     time.Time
+	//Time field is NOT a global clock, this is when the user PERCEIVES that they sent a message
+	//For UI only, not to be used for causality/ordering
 }
 
 type BroadcastMessageRequest struct {
 	Sender  Contact
 	MsgID   ID
 	GroupID ID
-	Message string
+	Message Message
 }
 
 type BroadcastMessageResponse struct {
@@ -206,13 +217,13 @@ type BroadcastMessageResponse struct {
 func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastMessageResponse) error {
 	foundGroup, group := k.FindGroupWithGroupID(req.GroupID)
 	if foundGroup {
+		log.Printf("Recevied broadcast message %s", req.Message)
 		if group.IsRendezvousPoint {
-			//RV point stuff done here
+			//RV point specific stuff here (ordering, ...)
 		}
-		if req.Sender.Equals(group.Parent) {
-			log.Printf("Recevied broadcast message %s", req.Message)
+		if group.IsRendezvousPoint || req.Sender.Equals(group.Parent) {
 			if group.Member {
-				fmt.Println(req.Message)
+				fmt.Printf("%s %s - %s\n", req.Message.Time.Format("3:04pm"), req.Message.Username, req.Message.Message)
 				//TODO: Send to main for formatting
 			}
 			current := group.Children.Front()
@@ -221,7 +232,6 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 				k.SendBroadcastMessage(child, group, req.Message)
 				current = current.Next()
 			}
-
 		} else {
 			log.Printf("Received broadcast request from non-parent %s - %i", req.Sender.NodeID.AsString(), req.Sender.NodeID.DistanceBucket(group.GroupID))
 		}
@@ -281,14 +291,14 @@ func (k *Kademlia) SendCreateGroup(group *Group) {
 		return
 	}
 
-	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("Received response to CreateGroup request from %v:%v\n", req.Sender.Host, req.Sender.Port)
 	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 
 	client.Close()
 }
 
 //Should return an error
-func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Contact, parent *Contact) bool {
+func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Contact, parent *Contact, rendezvousPoint *Contact) bool {
 
 	log.Printf("Sending add path to group to %v\n", k.GetContactAddress(contact))
 	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
@@ -302,6 +312,7 @@ func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Con
 	req.MsgID = NewRandomID()
 	req.GroupID = group.GroupID
 	req.Child = *child
+	req.RendezvousPoint = *rendezvousPoint
 	if parent == nil {
 		req.HasParent = false
 	} else {
@@ -316,15 +327,15 @@ func (k *Kademlia) SendAddPathToGroup(group *Group, contact *Contact, child *Con
 		return false
 	}
 
-	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("Received response to AddPathToGroup request from %v:%v\n", req.Sender.Host, req.Sender.Port)
 	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 
 	client.Close()
 	return res.AlreadyHasPathToRendezvousPoint
 }
 
-func (k *Kademlia) SendBroadcastMessage(contact *Contact, group *Group, message string) {
-	log.Printf("Sending broadcast message to group to %v\n", k.GetContactAddress(contact))
+func (k *Kademlia) SendBroadcastMessage(contact *Contact, group *Group, message Message) {
+	log.Printf("Sending message to %v\n", k.GetContactAddress(contact))
 	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
 	if err != nil {
 		log.Printf("Connection error")
@@ -344,7 +355,7 @@ func (k *Kademlia) SendBroadcastMessage(contact *Contact, group *Group, message 
 		return
 	}
 
-	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("Received response to BroadcastMessage from %v:%v\n", req.Sender.Host, req.Sender.Port)
 	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 
 	client.Close()
@@ -371,7 +382,7 @@ func (k *Kademlia) SendLeaveGroup(contact *Contact, group *Group) {
 		return
 	}
 
-	log.Printf("Received response from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("Received response to LeaveGroup from %v:%v\n", req.Sender.Host, req.Sender.Port)
 	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 
 	client.Close()
@@ -394,13 +405,17 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 	group.Member = true
 	if group.IsRendezvousPoint || group.Parent != nil {
 		//We already have a path to the RV point
-		log.Printf("Already in group %s", groupName)
+		log.Printf("Already have path %s", groupName)
 	} else {
 		result := k.iterativeOperation(group.GroupID, iterativeFindNodeOperation)
+
+		group.RendezvousPoint = result.Path.Back().Value.(*Contact)
+
 		//Assume path has at least one entry (self)
 		previous := result.Path.Front()
 		current := previous.Next() //1st in list is self, no need to do anything with that
 		completePath := false
+
 		for current != nil && !completePath {
 			next := current.Next()
 			var nextNodeInPath *Contact = nil
@@ -416,19 +431,22 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 			}
 			//Send request to current to add previous to children and next to parent
 			//If current already has a path to the rv point, completePath will become true and the loop will terminate
-			completePath = k.SendAddPathToGroup(group, nodeInPath, previousNodeInPath, nextNodeInPath)
+			completePath = k.SendAddPathToGroup(group, nodeInPath, previousNodeInPath, nextNodeInPath, group.RendezvousPoint)
 			previous = current
 			current = next
 		}
 	}
+	group.PrintGroup()
 
 }
 
-func (k *Kademlia) DoBroadcastMessage(groupName string, message string) {
+func (k *Kademlia) DoBroadcastMessage(groupName string, message string) bool {
 	didFindGroup, group := k.FindGroupWithName(groupName)
-	if didFindGroup && group.RendezvousPoint != nil {
-		k.SendBroadcastMessage(group.RendezvousPoint, group, message)
+	if didFindGroup && group.Member && group.RendezvousPoint != nil {
+		messageStruct := Message{Message: message, Username: "A User", Time: time.Now()}
+		k.SendBroadcastMessage(group.RendezvousPoint, group, messageStruct)
 	}
+	return didFindGroup && group.Member
 }
 
 func (k *Kademlia) DoLeaveGroup(groupName string) {
