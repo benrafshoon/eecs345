@@ -81,3 +81,39 @@ func Test_RandomIDInBucket(t *testing.T) {
 	t.Log(id2.RandomIDInBucket(0).AsString())
 	t.Log(id2.RandomIDInBucket(159).AsString())
 }
+
+func Test_FlipBitsInEmptyBranches_1(t *testing.T) {
+	id1, _ := FromString("0000000000000000000000000000000000000000")
+	id2, _ := FromString("0000000000000000000000000000000000000004")
+	distance := id1.FlipBitsInEmptyBranches(id2).DistanceBucket(id2)
+	if distance != 2 {
+		t.Logf("Expected distance 2, got %d", distance)
+	}
+}
+
+func Test_FlipBitsInEmptyBranches_2(t *testing.T) {
+	id1, _ := FromString("0000000000000000000000000000000000000007")
+	id2, _ := FromString("0000000000000000000000000000000000000004")
+	distance := id1.FlipBitsInEmptyBranches(id2).DistanceBucket(id2)
+	if distance != 0 {
+		t.Logf("Expected distance 0, got %d", distance)
+	}
+}
+
+func Test_FlipBitsInEmptyBranches_3(t *testing.T) {
+	id1, _ := FromString("0000000000000000000000000000000000000000")
+	id2, _ := FromString("0000000000000000000000000000000000000400")
+	distance := id1.FlipBitsInEmptyBranches(id2).DistanceBucket(id2)
+	if distance != 10 {
+		t.Logf("Expected distance 10, got %d", distance)
+	}
+}
+
+func Test_FlipBitsInEmptyBranches_4(t *testing.T) {
+	id1, _ := FromString("00000000000000000000000000000000000007FF")
+	id2, _ := FromString("0000000000000000000000000000000000000400")
+	distance := id1.FlipBitsInEmptyBranches(id2).DistanceBucket(id2)
+	if distance != 0 {
+		t.Logf("Expected distance 0, got %d", distance)
+	}
+}

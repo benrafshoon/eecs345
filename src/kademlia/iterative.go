@@ -109,17 +109,43 @@ func (s *ShortList) delete(toDelete *Contact) {
 	}
 }
 
-func (s *ShortList) closestToToFind() *Contact {
-	var closest *Contact = nil
+func (s *ShortList) closestToToFind() *IterativeContact {
+	log.Printf("Finding closest in shortlist")
+	s.print()
+	setOfClosest := list.New()
 	closestDistance := const_B
-
+	log.Printf("Finding closest in shortlist")
+	//First find closest (there may be several)
 	for i := 0; i < len(s.list); i++ {
-		currentDistance := s.list[i].contact.NodeID.DistanceBucket(s.toFind)
+		currentDistance := s.toFind.DistanceBucket(s.list[i].contact.NodeID)
+		log.Printf("Current distance %d, closest distance %d", currentDistance, closestDistance)
 		if currentDistance < closestDistance {
+			setOfClosest = list.New()
+			setOfClosest.PushBack(s.list[i])
 			closestDistance = currentDistance
-			closest = s.list[i].contact
+		} else if currentDistance == closestDistance {
+			setOfClosest.PushBack(s.list[i])
 		}
 	}
+	log.Printf("Found set of %d closest", setOfClosest.Len())
+	//Then zero bits of the empty branches to find the single closest (sort of a heuristic to get consistent single closest)
+	current := setOfClosest.Front()
+	closestDistance = const_B
+	var closest *IterativeContact
+	for current != nil {
+
+		currentIC := current.Value.(*IterativeContact)
+		currentDistance := s.toFind.ZeroBitsInEmptyBranches(currentIC.contact.NodeID).DistanceBucket(currentIC.contact.NodeID)
+
+		log.Printf("%s - %d", currentIC.contact.NodeID.AsString(), currentDistance)
+		log.Printf("Flipped %s", s.toFind.ZeroBitsInEmptyBranches(currentIC.contact.NodeID).AsString())
+		if currentDistance < closestDistance {
+			closestDistance = currentDistance
+			closest = currentIC
+		}
+		current = current.Next()
+	}
+	log.Printf("found single closest %s", closest.contact.NodeID.AsString())
 	return closest
 }
 
@@ -198,12 +224,12 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) it
 
 	selfIterativeContact := new(IterativeContact)
 	selfIterativeContact.contact = kademlia.RoutingTable.SelfContact
-
 	for i := 0; i < len(foundContacts); i++ {
 		shortList.insert(foundContacts[i], selfIterativeContact)
 	}
-
+	log.Printf("Shortlist initially populated")
 	nothingCloser := false
+	currentClosestDistance := shortList.closestToToFind().contact.NodeID.DistanceBucket(toFind)
 	triedAll := false
 	numResponsesSent := 0
 
@@ -260,10 +286,10 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) it
 					log.Printf("   Found the value")
 					shortList.delete(result.Contact.contact)
 					closest := shortList.closestToToFind() //This could be nil if the shortList only had one contact
-					if closest != nil && closest.NodeID.DistanceBucket(toFind) < result.Contact.contact.NodeID.DistanceBucket(toFind) {
-						log.Printf("Node %v is closer than node that found value %v", closest.NodeID.AsString, result.Contact.contact.NodeID.AsString())
+					if closest != nil && closest.contact.NodeID.DistanceBucket(toFind) < result.Contact.contact.NodeID.DistanceBucket(toFind) {
+						log.Printf("Node %v is closer than node that found value %v", closest.contact.NodeID.AsString, result.Contact.contact.NodeID.AsString())
 						log.Printf("Storing key value pair in closer node")
-						go kademlia.SendStore(closest, toFind, result.FoundValue)
+						go kademlia.SendStore(closest.contact, toFind, result.FoundValue)
 					}
 					returnValue.Path = result.Contact.collectPath(kademlia.RoutingTable.SelfContact)
 					returnValue.WhereFound = result.Contact.contact
@@ -279,9 +305,10 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) it
 							log.Printf("   Node already in shortlist")
 						} else {
 							shortList.insert(result.FoundContacts[j], result.Contact)
-							//If the new closest index is the one we just inserted
-							if shortList.list[shortList.closestIndex].contact.Equals(result.FoundContacts[j]) {
+
+							if result.FoundContacts[j].NodeID.DistanceBucket(toFind) < currentClosestDistance {
 								nothingCloser = false
+								currentClosestDistance = result.FoundContacts[j].NodeID.DistanceBucket(toFind)
 							}
 						}
 					}
@@ -319,7 +346,7 @@ func (kademlia *Kademlia) iterativeOperation(toFind ID, operationType string) it
 
 	returnValue.FoundContacts = returnContacts
 	shortList.print()
-	returnValue.Path = shortList.list[shortList.closestIndex].collectPath(kademlia.RoutingTable.SelfContact)
+	returnValue.Path = shortList.closestToToFind().collectPath(kademlia.RoutingTable.SelfContact)
 	log.Printf("Path to closest found node")
 	current := returnValue.Path.Front()
 	for current != nil {

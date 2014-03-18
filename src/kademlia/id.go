@@ -184,3 +184,23 @@ func (id ID) RandomIDInBucket(bucket int) ID {
 	}
 	return result
 }
+
+func (id ID) ZeroBitsInEmptyBranches(otherID ID) ID {
+	distance := id.DistanceBucket(otherID)
+	var flippedID ID
+	for byteI := 0; byteI < IDBytes; byteI++ {
+		bits := distance - (19-byteI)*8
+		if bits < 0 {
+			flippedID[byteI] = id[byteI]
+		} else if bits >= 8 {
+			flippedID[byteI] = uint8(0x0)
+		} else {
+			shift := uint8(bits + 1) //shift is E [1, 8]
+			zeroMask := (uint8(0xFF) << shift)
+			flippedID[byteI] = id[byteI] & zeroMask
+		}
+
+	}
+	return flippedID
+
+}
