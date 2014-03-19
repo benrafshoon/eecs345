@@ -202,5 +202,12 @@ func (id ID) ZeroBitsInEmptyBranches(otherID ID) ID {
 
 	}
 	return flippedID
+}
 
+//NOT symmetric
+//int(math.Floor(id.DistanceBucketUnique(otherID))) == id.DistanceBucket(otherID)
+func (id ID) DistanceBucketUnique(otherID ID) float64 {
+	distance := id.DistanceBucket(otherID)
+	zerodDistance := id.ZeroBitsInEmptyBranches(otherID).DistanceBucket(otherID)
+	return float64(distance) + float64(zerodDistance)/float64(IDBytes*8)
 }

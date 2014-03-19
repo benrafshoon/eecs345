@@ -45,15 +45,23 @@ func newShortList(toFind ID) *ShortList {
 }
 
 func (s *ShortList) closestDistance() int {
-	return s.list[s.closestIndex].contact.NodeID.DistanceBucket(s.toFind)
+	return s.toFind.DistanceBucket(s.list[s.closestIndex].contact.NodeID)
+}
+
+func (s *ShortList) closestDistanceUnique() float64 {
+	return s.toFind.DistanceBucketUnique(s.list[s.closestIndex].contact.NodeID)
 }
 
 func (s *ShortList) farthestDistance() int {
-	return s.list[s.farthestIndex].contact.NodeID.DistanceBucket(s.toFind)
+	return s.toFind.DistanceBucket(s.list[s.farthestIndex].contact.NodeID)
+}
+
+func (s *ShortList) farthestDistanceUnique() float64 {
+	return s.toFind.DistanceBucketUnique(s.list[s.farthestIndex].contact.NodeID)
 }
 
 func (s *ShortList) insert(toInsert *Contact, foundBy *IterativeContact) {
-	distance := toInsert.NodeID.DistanceBucket(s.toFind)
+	distanceUnique := s.toFind.DistanceBucketUnique(toInsert.NodeID)
 
 	if len(s.list) != cap(s.list) { //we aren't at capacity
 		newContact := new(IterativeContact) //convert them to this data struct
@@ -64,25 +72,25 @@ func (s *ShortList) insert(toInsert *Contact, foundBy *IterativeContact) {
 		s.list = s.list[0 : len(s.list)+1]
 		s.list[len(s.list)-1] = newContact
 
-		if s.farthestIndex == -1 || distance > s.farthestDistance() {
+		if s.farthestIndex == -1 || distanceUnique > s.farthestDistanceUnique() {
 			s.farthestIndex = len(s.list) - 1
 		}
-		if s.closestIndex == -1 || distance < s.closestDistance() {
+		if s.closestIndex == -1 || distanceUnique < s.closestDistanceUnique() {
 			s.closestIndex = len(s.list) - 1
 		}
 
-	} else if distance < s.farthestDistance() { //we have no room so we only want to add things that are closer
+	} else if distanceUnique < s.farthestDistanceUnique() { //we have no room so we only want to add things that are closer
 		newContact := new(IterativeContact) //convert them to this data struct
 		newContact.checked = false
 		newContact.contact = toInsert
 		s.list[s.farthestIndex] = newContact //kick out the furthest thing
-		if s.closestIndex == -1 || distance < s.closestDistance() {
+		if s.closestIndex == -1 || distanceUnique < s.closestDistanceUnique() {
 			s.closestIndex = s.farthestIndex
 		}
 		s.farthestIndex = 0
 		for k := 0; k < len(s.list); k++ {
-			distance = s.list[k].contact.NodeID.DistanceBucket(s.toFind)
-			if distance > s.farthestDistance() {
+			distanceUnique = s.list[k].contact.NodeID.DistanceBucketUnique(s.toFind)
+			if distanceUnique > s.farthestDistanceUnique() {
 				s.farthestIndex = k
 			}
 		}
