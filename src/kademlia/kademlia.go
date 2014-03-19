@@ -133,6 +133,19 @@ func (kademlia *Kademlia) markAliveAndPossiblyPing(contact *Contact) {
 	if needToPing {
 		go kademlia.SendPing(contactToPing)
 	}
+	//If self is the current rendezvous point and become aware of a closer node, transfer RV responsibility to newly discovered node
+	for _, group := range kademlia.Groups {
+		log.Printf("Checking group %s", group.GroupID.AsString())
+		log.Printf("New node distance %f", group.GroupID.DistanceBucketUnique(contact.NodeID))
+		log.Printf("Self distance %f", group.GroupID.DistanceBucketUnique(kademlia.RoutingTable.SelfContact.NodeID))
+		if group.IsRendezvousPoint && group.GroupID.DistanceBucketUnique(contact.NodeID) < group.GroupID.DistanceBucketUnique(kademlia.RoutingTable.SelfContact.NodeID) {
+			log.Printf("Need to transfer RV point to node %s", contact.NodeID.AsString())
+			group.RendezvousPoint = contact
+			group.Parent = contact
+			group.IsRendezvousPoint = false
+			kademlia.SendCreateGroup(group, kademlia.RoutingTable.SelfContact)
+		}
+	}
 }
 
 type sendPingResult struct {

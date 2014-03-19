@@ -138,9 +138,11 @@ func (k *Kademlia) FindGroupWithName(name string) (bool, *Group) {
 }
 
 type CreateGroupRequest struct {
-	Sender  Contact
-	MsgID   ID
-	GroupID ID
+	Sender   Contact
+	HasChild bool
+	Child    Contact
+	MsgID    ID
+	GroupID  ID
 }
 
 type CreateGroupResult struct {
@@ -149,10 +151,14 @@ type CreateGroupResult struct {
 
 //Similar to scribe create
 func (k *Kademlia) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) error {
+	log.Printf("Create group %s", req.GroupID.AsString())
 	group, _ := k.AddGroupWithGroupID(req.GroupID)
 	group.IsRendezvousPoint = true
 	group.RendezvousPoint = k.RoutingTable.SelfContact
 	group.Parent = k.RoutingTable.SelfContact
+	if req.HasChild {
+		group.Children.PushFront(&req.Child)
+	}
 	group.PrintGroup()
 	res.MsgID = req.MsgID
 	return nil
@@ -270,7 +276,7 @@ func (k *Kademlia) LeaveGroup(req LeaveGroupRequest, res *LeaveGroupResponse) er
 
 //Primitive sends
 
-func (k *Kademlia) SendCreateGroup(group *Group) {
+func (k *Kademlia) SendCreateGroup(group *Group, child *Contact) {
 	rvPoint := group.RendezvousPoint
 	log.Printf("Sending create group to %v\n", k.GetContactAddress(rvPoint))
 	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(rvPoint))
@@ -283,6 +289,11 @@ func (k *Kademlia) SendCreateGroup(group *Group) {
 	req.Sender = *k.RoutingTable.SelfContact
 	req.MsgID = NewRandomID()
 	req.GroupID = group.GroupID
+	req.HasChild = false
+	if child != nil {
+		req.HasChild = true
+		req.Child = *child
+	}
 	var res CreateGroupResult
 
 	err = client.Call("Kademlia.CreateGroup", req, &res)
@@ -395,7 +406,7 @@ func (k *Kademlia) DoCreateGroup(groupName string) {
 	if isNewGroup {
 		result := k.iterativeOperation(group.GroupID, iterativeFindNodeOperation)
 		group.RendezvousPoint = result.Path.Back().Value.(*Contact)
-		k.SendCreateGroup(group)
+		k.SendCreateGroup(group, nil)
 	}
 	group.PrintGroup()
 }
@@ -459,5 +470,4 @@ func (k *Kademlia) DoLeaveGroup(groupName string) {
 		}
 		group.PrintGroup()
 	}
-
 }
