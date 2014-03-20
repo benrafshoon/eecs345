@@ -70,10 +70,10 @@ type Pong struct {
 }
 
 func (k *Kademlia) Ping(ping Ping, pong *Pong) error {
-	log.Printf("Received ping from %v:%v\n", ping.Sender.Host, ping.Sender.Port)
+	/*log.Printf("Received ping from %v:%v\n", ping.Sender.Host, ping.Sender.Port)
 	log.Printf("          Node ID: %v\n", ping.Sender.NodeID.AsString())
 	log.Printf("       Message ID: %v\n", ping.MsgID.AsString())
-	log.Printf("Sending pong back\n")
+	log.Printf("Sending pong back\n")*/
 
 	pong.MsgID = CopyID(ping.MsgID)
 	pong.Sender = *k.RoutingTable.SelfContact

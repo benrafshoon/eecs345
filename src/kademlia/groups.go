@@ -17,6 +17,16 @@ type Group struct {
 	Children          *list.List
 	Member            bool
 	IsRendezvousPoint bool
+	Messages          *list.List
+}
+
+type Message struct {
+	Message  string
+	Username string
+	Time     time.Time
+	Order    int
+	//Time field is NOT a global clock, this is when the user PERCEIVES that they sent a message
+	//For UI only, not to be used for causality/ordering
 }
 
 //Parent == nil implies RV point
@@ -38,6 +48,7 @@ func newGroup() *Group {
 	group.Member = false
 	group.RendezvousPoint = nil
 	group.IsRendezvousPoint = false
+	group.Messages = list.New()
 	return group
 }
 
@@ -203,14 +214,6 @@ func (k *Kademlia) AddPathToGroup(req AddPathToGroupRequest, res *AddPathToGroup
 	return nil
 }
 
-type Message struct {
-	Message  string
-	Username string
-	Time     time.Time
-	//Time field is NOT a global clock, this is when the user PERCEIVES that they sent a message
-	//For UI only, not to be used for causality/ordering
-}
-
 type BroadcastMessageRequest struct {
 	Sender  Contact
 	MsgID   ID
@@ -227,12 +230,17 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 	if foundGroup {
 		log.Printf("Recevied broadcast message %s", req.Message)
 		if group.IsRendezvousPoint {
-			//RV point specific stuff here (ordering, ...)
+			lastMessage := group.Messages.Front()
+			messageNumber := 0
+			if(lastMessage!=nil) {
+				messageNumber = lastMessage.Value.(Message).Order + 1
+			}
+			req.Message.Order = messageNumber //assign it a number
 		}
 		if group.IsRendezvousPoint || req.Sender.Equals(group.Parent) {
 			if group.Member {
-				fmt.Printf("%s %s - %s\n", req.Message.Time.Format("3:04pm"), req.Message.Username, req.Message.Message)
-				//TODO: Send to main for formatting
+				group.Messages.PushFront(req.Message)
+				fmt.Printf("%s %s - %s\n Message Number:%i \n", req.Message.Time.Format("3:04pm"), req.Message.Username, req.Message.Message, req.Message.Order)
 			}
 			current := group.Children.Front()
 			for current != nil {

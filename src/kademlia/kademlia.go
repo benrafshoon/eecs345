@@ -182,8 +182,8 @@ func (kademlia *Kademlia) SendPing(contact *Contact) (*Contact, error) {
 			return
 		}
 
-		log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
-		log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
+		//log.Printf("Received pong from %v:%v\n", pong.Sender.Host, pong.Sender.Port)
+		//log.Printf("          Node ID: %v\n", pong.Sender.NodeID.AsString())
 
 		if ping.MsgID.Equals(pong.MsgID) {
 			kademlia.markAliveAndPossiblyPing(&pong.Sender)
