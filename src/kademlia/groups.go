@@ -462,6 +462,8 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 				//If there is already a parent, we will never reach this branch
 				group.Parent = nodeInPath
 				k.CheckForHeartbeat(group.Parent, groupName)
+				log.Printf("\n\nSending the check now")
+				k.SendCheckForLostMessages(group.Parent, groupName) //let's get all of those old messages
 			}
 			//Send request to current to add previous to children and next to parent
 			//If current already has a path to the rv point, completePath will become true and the loop will terminate
@@ -521,7 +523,7 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 
 func (k *Kademlia) SendCheckForLostMessages(parent *Contact, groupName string) bool{
 	
-	log.Printf("Sending add path to group to %v\n", k.GetContactAddress(parent))
+	log.Printf("Sending check for lost messages %v\n", k.GetContactAddress(parent))
 	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(parent))
 	if err != nil {
 		log.Printf("Connection error")
@@ -542,6 +544,15 @@ func (k *Kademlia) SendCheckForLostMessages(parent *Contact, groupName string) b
 	}
 
 	client.Close()
+
+	didFindGroup, group := k.FindGroupWithName(groupName)
+	if didFindGroup {
+		parentsHighestNum := res.Messages.Front().Value.(Message).Order
+		nodesHighestNum := group.Messages.Front().Value.(Message).Order
+		if(parentsHighestNum != nodesHighestNum) {
+			group.Messages = res.Messages
+		}
+	}
 
 	return true
 }
