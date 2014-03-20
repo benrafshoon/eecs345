@@ -29,6 +29,17 @@ type Message struct {
 	//For UI only, not to be used for causality/ordering
 }
 
+type GetAllMessagesRequest struct {
+	Sender          Contact
+	MsgID           ID
+	GroupName       string
+}
+
+type GetAllMessagesResponse struct {
+	MsgID			ID
+	Messages 		*list.List
+}
+
 //Parent == nil implies RV point
 
 func groupID(name string) ID {
@@ -506,4 +517,40 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 			}
 		}(parent)
 	}
+}
+
+func (k *Kademlia) SendCheckForLostMessages(parent *Contact, groupName string) bool{
+	
+	log.Printf("Sending add path to group to %v\n", k.GetContactAddress(parent))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(parent))
+	if err != nil {
+		log.Printf("Connection error")
+		return false
+	}
+
+	req := new(GetAllMessagesRequest)
+	req.Sender = *k.RoutingTable.SelfContact
+	req.MsgID = NewRandomID()
+	req.GroupName = groupName
+
+	var res GetAllMessagesResponse
+
+	err = client.Call("Kademlia.CheckForLostMessages", req, &res)
+	if err != nil {
+		log.Printf("Error in remote node response")
+		return false
+	}
+
+	client.Close()
+
+	return true
+}
+
+func (k *Kademlia) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
+	didFindGroup, group := k.FindGroupWithName(req.GroupName)
+	if didFindGroup {
+		res.Messages = group.Messages
+	}
+	res.MsgID = req.MsgID
+	return nil
 }
