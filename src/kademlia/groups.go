@@ -443,7 +443,6 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 				//If there is already a parent, we will never reach this branch
 				group.Parent = nodeInPath
 				k.CheckForHeartbeat(group.Parent, groupName)
-				log.Printf("\n\nCalling the heartbeat method")
 			}
 			//Send request to current to add previous to children and next to parent
 			//If current already has a path to the rv point, completePath will become true and the loop will terminate
@@ -478,25 +477,25 @@ func (k *Kademlia) DoLeaveGroup(groupName string) {
 }
 
 func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
-	//We want to check to make sure our parent is still alive
-	go func(parent *Contact) { //do this away from the main thread
-		up := true
-		for up { //infinite loop
-			log.Printf("\n\nChecking again")
-			_, error := k.SendPing(parent);
-			if (error!=nil) {
-				log.Printf("Parent went down!")
-				up = false
+	log.Printf("Checking what parent is: %s", parent.NodeID.AsString())
+	if(parent!=nil) { //shouldn't happen but safety first!
+		//We want to check to make sure our parent is still alive
+		go func(parent *Contact) { //do this away from the main thread
+			up := true
+			for up { //infinite loop
+				time.Sleep(5 * time.Second) //Let's wait initially, when we start it likely will stay up
+				_, error := k.SendPing(parent); //Check if it's up
+				
+				if (error!=nil) { //rut-roh 
+					up = false //stop looping
+					
+					didFindGroup, group := k.FindGroupWithName(groupName)
+					if didFindGroup {
+						group.Parent = nil //signal we need a new parent
+						k.DoJoinGroup(groupName) //rejoin the group
+					}
+				}
 			}
-			time.Sleep(5 * time.Second)
-		}
-		log.Printf("Exiting go routine")
-	}(parent)
-
-	/*didFindGroup, group := k.FindGroupWithName(groupName)
-	if didFindGroup {
-		group.Parent = nil
-		k.DoJoinGroup(groupName)
+		}(parent)
 	}
-	log.Printf("Need to execute more code")*/
 }
