@@ -25,6 +25,7 @@ type Kademlia struct {
 	RoutingTable *KBucketTable
 	Data         *KeyValueStore
 	Groups       map[string]*Group
+	Username     string
 }
 
 func NewKademlia() *Kademlia {

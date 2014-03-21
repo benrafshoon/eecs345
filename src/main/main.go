@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	//"io/ioutil"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -20,10 +20,10 @@ func main() {
 	// By default, Go seeds its RNG with 1. This would cause every program to
 	// generate the same sequence of IDs.
 	rand.Seed(time.Now().UnixNano())
-	//log.SetOutput(ioutil.Discard)
+	log.SetOutput(ioutil.Discard)
 	// Get the bind and connect connection strings from command-line arguments.
 
-	name := flag.String("name", "untitled", "Enter username")
+	name := flag.String("name", "Unnamed user", "Enter username")
 	testNodeIDString := flag.String("id", "", "Optionally specify the node ID for testing")
 	listenStr := flag.String("listen", "", "Enter ip address to listen on")
 	firstPeerStr := flag.String("first-peer", "", "Enter ip address of first peer")
@@ -53,6 +53,8 @@ func main() {
 	} else {
 		kademliaServer = kademlia.NewKademlia()
 	}
+
+	kademliaServer.Username = *name
 
 	error := kademliaServer.StartKademliaServer(*listenStr)
 
@@ -379,7 +381,7 @@ func main() {
 			message := strings.SplitAfterN(input, " ", 3)[2]
 			groupExists := kademliaServer.DoBroadcastMessage(groupName, message)
 			if !groupExists {
-				fmt.Printf("Error in command \"send_message\": not a member of group %s", groupName)
+				fmt.Printf("Error in command \"send_message\": not a member of group %s\n", groupName)
 			}
 
 		case "leave_group":

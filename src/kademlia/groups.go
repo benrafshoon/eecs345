@@ -23,24 +23,19 @@ type Group struct {
 type Message struct {
 	Message  string
 	Username string
-	Time     time.Time
 	Order    int
-	//Time field is NOT a global clock, this is when the user PERCEIVES that they sent a message
-	//For UI only, not to be used for causality/ordering
 }
 
 type CheckForLostMessagesRequest struct {
-	Sender          Contact
-	MsgID           ID
-	GroupID         ID
+	Sender  Contact
+	MsgID   ID
+	GroupID ID
 }
 
 type CheckForLostMessagesResponse struct {
-	MsgID			ID
-	Messages 		*list.List
+	MsgID    ID
+	Messages *list.List
 }
-
-//Parent == nil implies RV point
 
 func groupID(name string) ID {
 	h := sha1.New()
@@ -259,7 +254,7 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 			}
 			lastMessage := group.Messages.Front()
 			messageNumber := 0
-			if(lastMessage!=nil) {
+			if lastMessage != nil {
 				messageNumber = lastMessage.Value.(Message).Order + 1
 			}
 			req.Message.Order = messageNumber //assign it a number
@@ -267,7 +262,8 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 		if group.IsRendezvousPoint || req.Sender.Equals(group.Parent) {
 			if group.Member {
 				group.Messages.PushFront(req.Message)
-				fmt.Printf("%s %s - %s\n Message Number:%i \n", req.Message.Time.Format("3:04pm"), req.Message.Username, req.Message.Message, req.Message.Order)
+				log.Printf("Message number: %i", req.Message.Order)
+				fmt.Printf("%s | %s | %s\n", group.Name, req.Message.Username, req.Message.Message)
 			}
 			current := group.Children.Front()
 			for current != nil {
@@ -493,7 +489,7 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 func (k *Kademlia) DoBroadcastMessage(groupName string, message string) bool {
 	didFindGroup, group := k.FindGroupWithName(groupName)
 	if didFindGroup && group.Member && group.RendezvousPoint != nil {
-		messageStruct := Message{Message: message, Username: "A User", Time: time.Now()}
+		messageStruct := Message{Message: message, Username: k.Username}
 		k.SendBroadcastMessage(group.RendezvousPoint, group, messageStruct)
 	}
 	return didFindGroup && group.Member
@@ -512,22 +508,22 @@ func (k *Kademlia) DoLeaveGroup(groupName string) {
 }
 
 func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
-	if(parent!=nil) { //shouldn't happen but safety first!
+	if parent != nil { //shouldn't happen but safety first!
 		//We want to check to make sure our parent is still alive
 		go func(parent *Contact) { //do this away from the main thread
 			up := true
 			for up { //infinite loop
 				time.Sleep(5 * time.Second) //Let's wait initially, when we start it likely will stay up
 				log.Printf("Heartbeat: %s", parent.NodeID.AsString())
-				_, error := k.SendPing(parent); //Check if it's up
-				
-				if (error!=nil) { //rut-roh 
+				_, error := k.SendPing(parent) //Check if it's up
+
+				if error != nil { //rut-roh
 					up = false //stop looping
-					
+
 					didFindGroup, group := k.FindGroupWithName(groupName)
 					if didFindGroup {
 						group.RendezvousPoint = nil
-						group.Parent = nil //signal we need a new parent
+						group.Parent = nil       //signal we need a new parent
 						k.DoJoinGroup(groupName) //rejoin the group
 					}
 				}
@@ -537,7 +533,7 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 }
 
 func (k *Kademlia) SendCheckForLostMessages(groupID ID, contact *Contact) {
-	
+
 	log.Printf("Sending check for lost messages %v\n", k.GetContactAddress(contact))
 	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
 	if err != nil {
@@ -568,7 +564,7 @@ func (k *Kademlia) SendCheckForLostMessages(groupID ID, contact *Contact) {
 	if didFindGroup {
 		highestNum := res.Messages.Front().Value.(Message).Order
 		ourHighestNum := group.Messages.Front().Value.(Message).Order
-		if(highestNum > ourHighestNum) {
+		if highestNum > ourHighestNum {
 			group.Messages = res.Messages
 		}
 	}
