@@ -29,13 +29,13 @@ type Message struct {
 	//For UI only, not to be used for causality/ordering
 }
 
-type GetAllMessagesRequest struct {
+type CheckForLostMessagesRequest struct {
 	Sender          Contact
 	MsgID           ID
 	GroupID         ID
 }
 
-type GetAllMessagesResponse struct {
+type CheckForLostMessagesResponse struct {
 	MsgID			ID
 	Messages 		*list.List
 }
@@ -186,14 +186,14 @@ func (k *Kademlia) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) e
 	return nil
 }
 
-func (k *Kademlia) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
+func (k *Kademlia) CheckForLostMessages(req CheckForLostMessagesRequest, res *CheckForLostMessagesResponse) error {
 	log.Printf("checkingforlostmessages")
 	didFindGroup, group := k.FindGroupWithGroupID(req.GroupID)
 	if didFindGroup {
 		res.Messages = group.Messages
 	}
-	res.MsgID = req.MsgID
 	log.Printf("returning!")
+
 	return nil
 }
 
@@ -254,8 +254,8 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 		if group.IsRendezvousPoint {
 			current := group.Children.Front()
 			if current != nil {
-				child := current.Value.(*Contact)
-				k.SendCheckForLostMessages(req.GroupID, child)
+				//child := current.Value.(*Contact)
+				//k.SendCheckForLostMessages(req.GroupID, child)
 			}
 			lastMessage := group.Messages.Front()
 			messageNumber := 0
@@ -536,27 +536,30 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 	}
 }
 
-func (k *Kademlia) SendCheckForLostMessages(groupID ID, child *Contact) {
-
-	log.Printf("\n\nSending check for lost messages %v\n", k.GetContactAddress(child))
-	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(child))
+func (k *Kademlia) SendCheckForLostMessages(groupID ID, contact *Contact) {
+	
+	log.Printf("Sending check for lost messages %v\n", k.GetContactAddress(contact))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(contact))
 	if err != nil {
 		log.Printf("Connection error")
 		return
 	}
 
-	req := new(GetAllMessagesRequest)
+	req := new(CheckForLostMessagesRequest)
 	req.Sender = *k.RoutingTable.SelfContact
 	req.MsgID = NewRandomID()
 	req.GroupID = groupID
 
-	var res GetAllMessagesResponse
+	var res CheckForLostMessagesResponse
 
 	err = client.Call("Kademlia.CheckForLostMessages", req, &res)
 	if err != nil {
 		log.Printf("Error in remote node response: %s", err)
 		return
 	}
+
+	log.Printf("Received response to Check Lost Messages from %v:%v\n", req.Sender.Host, req.Sender.Port)
+	log.Printf("          Node ID: %v\n", req.Sender.NodeID.AsString())
 
 	client.Close()
 
@@ -569,6 +572,4 @@ func (k *Kademlia) SendCheckForLostMessages(groupID ID, child *Contact) {
 			group.Messages = res.Messages
 		}
 	}
-
-	return
 }

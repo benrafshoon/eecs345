@@ -42,6 +42,6 @@ func (wrapper *KademliaRPCWrapper) LeaveGroup(req LeaveGroupRequest, res *LeaveG
 	return wrapper.kademlia.LeaveGroup(req, res)
 }
 
-func (wrapper *KademliaRPCWrapper) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
+func (wrapper *KademliaRPCWrapper) CheckForLostMessages(req CheckForLostMessagesRequest, res *CheckForLostMessagesResponse) error {
 	return wrapper.kademlia.CheckForLostMessages(req, res)
 }
