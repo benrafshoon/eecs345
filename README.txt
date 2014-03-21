@@ -1,80 +1,36 @@
-************
-* BUILDING *
-************
+***NOTE*** The invocation of the program has changed from the specifications for project 1
 
-Go's build tools depend on the value of the GOPATH environment variable. $GOPATH
-should be the project root: the absolute path of the directory containing
-{bin,pkg,src}.
+Users of our service are be able to create, join, and leave messaging groups to send messages to a group of friends or peers. For our proof of concept implementation, we developed a simple command line interface to allow users to perform the basic Scribe group operations.
 
-Once you've set that, you should be able to build the skeleton and create an
-executable at bin/main with:
+The command line program has the following flags:
+    ­listen=ipaddress:port
+        The ip address and port that the instance should use
+    ­first­peer=ipaddress:port
+        The ip address and port of another node in the system to contact first
+    ­name=”A username”
+        Your username
 
-    go install main
-
-Running main as
-
-    main localhost:7890 localhost:7890
-
-will cause it to start up a server bound to localhost:7890 (the first argument)
-and then connect as a client to itself (the second argument). All it does by
-default is perform a PING RPC and exit.
+An example invocation with only one node might be:
+    ./main ­listen=localhost:4000 ­first­peer=localhost:4000 ­name=”John Smith”
 
 
+Once running, the following commands operate on a group:
+    create_group group_name
+        Creates a group with the given group name. The group name cannot contains
+        spaces. Creating a group does not join the group.
+    join_group group_name
+        Joins a group with the given group name. Joining a group allows you to send
+        messages to each node in the group and receive messages sent to the group.
+    send_message group_name a message
+        Sends a message to all members in the named group. Messages may contain
+        spaces.
+    leave_group group_name
+        Leaves the group with the given group name. Leaving the message stops you from receiving messages sent to that group.
 
-**************************
-* COMMAND-LINE INTERFACE *
-**************************
 
-As demonstrated above, your program must accept two positional arguments of the
-form "host:port". The first tells it the bind address of its own server; the
-second gives the first peer your client should connect to to join the network.
+To test this, we suggest setting up several nodes, and have one node create a group.  Each node should join the group.  
+Any node will be able to send a message to the group, and every node will receive messages sent by any node in groups
+that it has joined.
 
-After setting up its server and establishing a connection to its first peer,
-your executable should loop forever, reading commands from stdin, executing
-them, and printing their results to stdout. All data should be printed with
-the %v specifier and should be followed by exactly one newline. You may assume
-values are alphanumeric and are no more than 4095 B. All operations should
-complete within 10 seconds.
 
-Implement the following commands:
-
-whoami
-    Print your node ID.
-
-local_find_value key
-    If your node has data for the given key, print it.
-    If your node does not have data for the given key, you should print "ERR".
-
-get_contact ID
-    If your buckets contain a node with the given ID,
-        printf("%v %v\n", theNode.addr, theNode.port)
-    If your buckers do not contain any such node, print "ERR".
-
-iterativeStore key value
-    Perform the iterativeStore operation and then print the ID of the node that
-    received the final STORE operation.
-
-iterativeFindNode ID
-    Print a list of ≤ k closest nodes and print their IDs. You should collect
-    the IDs in a slice and print that.
-
-iterativeFindValue key
-    printf("%v %v\n", ID, value), where ID refers to the node that finally
-    returned the value. If you do not find a value, print "ERR".
-
-// The following four commands cause your code to invoke the appropriate RPC on
-// another node, specified by the nodeID argument.
-ping nodeID
-ping host:port
-    Perform a ping. 
-
-store nodeID key value 
-    Perform a store and print a blank line.
-
-find_node nodeID key
-    Perform a find_node and print its results as for iterativeFindNode.
-
-find_value nodeID key
-    Perform a find_value. If it returns nodes, print them as for find_node. If
-    it returns a value, print the value as in iterativeFindValue.
-
+See paper for implementation details
