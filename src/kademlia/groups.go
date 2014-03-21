@@ -252,11 +252,11 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 	if foundGroup {
 		log.Printf("Recevied broadcast message %s", req.Message)
 		if group.IsRendezvousPoint {
-			/*current := group.Children.Front()
+			current := group.Children.Front()
 			if current != nil {
 				child := current.Value.(*Contact)
-				//k.SendCheckForLostMessages(req.GroupID, child)
-			}*/
+				k.SendCheckForLostMessages(req.GroupID, child)
+			}
 			lastMessage := group.Messages.Front()
 			messageNumber := 0
 			if(lastMessage!=nil) {
@@ -526,6 +526,7 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 					
 					didFindGroup, group := k.FindGroupWithName(groupName)
 					if didFindGroup {
+						group.RendezvousPoint = nil
 						group.Parent = nil //signal we need a new parent
 						k.DoJoinGroup(groupName) //rejoin the group
 					}
