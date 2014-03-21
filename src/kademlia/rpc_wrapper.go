@@ -41,3 +41,7 @@ func (wrapper *KademliaRPCWrapper) BroadcastMessage(req BroadcastMessageRequest,
 func (wrapper *KademliaRPCWrapper) LeaveGroup(req LeaveGroupRequest, res *LeaveGroupResponse) error {
 	return wrapper.kademlia.LeaveGroup(req, res)
 }
+
+func (wrapper *KademliaRPCWrapper) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
+	return wrapper.kademlia.CheckForLostMessages(req, res)
+}

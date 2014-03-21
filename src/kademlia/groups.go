@@ -32,7 +32,7 @@ type Message struct {
 type GetAllMessagesRequest struct {
 	Sender          Contact
 	MsgID           ID
-	GroupName       string
+	GroupID         ID
 }
 
 type GetAllMessagesResponse struct {
@@ -186,6 +186,17 @@ func (k *Kademlia) CreateGroup(req CreateGroupRequest, res *CreateGroupResult) e
 	return nil
 }
 
+func (k *Kademlia) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
+	log.Printf("checkingforlostmessages")
+	didFindGroup, group := k.FindGroupWithGroupID(req.GroupID)
+	if didFindGroup {
+		res.Messages = group.Messages
+	}
+	res.MsgID = req.MsgID
+	log.Printf("returning!")
+	return nil
+}
+
 type AddPathToGroupRequest struct {
 	Sender          Contact
 	MsgID           ID
@@ -211,7 +222,7 @@ func (k *Kademlia) AddPathToGroup(req AddPathToGroupRequest, res *AddPathToGroup
 	if group.Parent == nil {
 		if req.HasParent {
 			group.Parent = &req.Parent
-			//k.CheckForHeartbeat(group.Parent, req.GroupName)
+			k.CheckForHeartbeat(group.Parent, req.GroupName)
 			res.AlreadyHasPathToRendezvousPoint = false
 			log.Printf("  Adding parent %s - %d", req.Parent.NodeID.AsString(), req.Parent.NodeID.DistanceBucket(group.GroupID))
 		}
@@ -241,6 +252,11 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 	if foundGroup {
 		log.Printf("Recevied broadcast message %s", req.Message)
 		if group.IsRendezvousPoint {
+			current := group.Children.Front()
+			if current != nil {
+				child := current.Value.(*Contact)
+				//k.SendCheckForLostMessages(req.GroupID, child)
+			}
 			lastMessage := group.Messages.Front()
 			messageNumber := 0
 			if(lastMessage!=nil) {
@@ -462,8 +478,6 @@ func (k *Kademlia) DoJoinGroup(groupName string) {
 				//If there is already a parent, we will never reach this branch
 				group.Parent = nodeInPath
 				k.CheckForHeartbeat(group.Parent, groupName)
-				log.Printf("\n\nSending the check now")
-				k.SendCheckForLostMessages(group.Parent, groupName) //let's get all of those old messages
 			}
 			//Send request to current to add previous to children and next to parent
 			//If current already has a path to the rv point, completePath will become true and the loop will terminate
@@ -498,13 +512,13 @@ func (k *Kademlia) DoLeaveGroup(groupName string) {
 }
 
 func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
-	log.Printf("Checking what parent is: %s", parent.NodeID.AsString())
 	if(parent!=nil) { //shouldn't happen but safety first!
 		//We want to check to make sure our parent is still alive
 		go func(parent *Contact) { //do this away from the main thread
 			up := true
 			for up { //infinite loop
 				time.Sleep(5 * time.Second) //Let's wait initially, when we start it likely will stay up
+				log.Printf("Heartbeat: %s", parent.NodeID.AsString())
 				_, error := k.SendPing(parent); //Check if it's up
 				
 				if (error!=nil) { //rut-roh 
@@ -521,47 +535,39 @@ func (k *Kademlia) CheckForHeartbeat(parent *Contact, groupName string) {
 	}
 }
 
-func (k *Kademlia) SendCheckForLostMessages(parent *Contact, groupName string) bool{
-	
-	log.Printf("Sending check for lost messages %v\n", k.GetContactAddress(parent))
-	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(parent))
+func (k *Kademlia) SendCheckForLostMessages(groupID ID, child *Contact) {
+
+	log.Printf("\n\nSending check for lost messages %v\n", k.GetContactAddress(child))
+	client, err := rpc.DialHTTP("tcp", k.GetContactAddress(child))
 	if err != nil {
 		log.Printf("Connection error")
-		return false
+		return
 	}
 
 	req := new(GetAllMessagesRequest)
 	req.Sender = *k.RoutingTable.SelfContact
 	req.MsgID = NewRandomID()
-	req.GroupName = groupName
+	req.GroupID = groupID
 
 	var res GetAllMessagesResponse
 
 	err = client.Call("Kademlia.CheckForLostMessages", req, &res)
 	if err != nil {
-		log.Printf("Error in remote node response")
-		return false
+		log.Printf("Error in remote node response: %s", err)
+		return
 	}
 
 	client.Close()
 
-	didFindGroup, group := k.FindGroupWithName(groupName)
+	log.Printf("leaving the call")
+	didFindGroup, group := k.FindGroupWithGroupID(groupID)
 	if didFindGroup {
-		parentsHighestNum := res.Messages.Front().Value.(Message).Order
-		nodesHighestNum := group.Messages.Front().Value.(Message).Order
-		if(parentsHighestNum != nodesHighestNum) {
+		highestNum := res.Messages.Front().Value.(Message).Order
+		ourHighestNum := group.Messages.Front().Value.(Message).Order
+		if(highestNum > ourHighestNum) {
 			group.Messages = res.Messages
 		}
 	}
 
-	return true
-}
-
-func (k *Kademlia) CheckForLostMessages(req GetAllMessagesRequest, res *GetAllMessagesResponse) error {
-	didFindGroup, group := k.FindGroupWithName(req.GroupName)
-	if didFindGroup {
-		res.Messages = group.Messages
-	}
-	res.MsgID = req.MsgID
-	return nil
+	return
 }
