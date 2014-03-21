@@ -252,11 +252,11 @@ func (k *Kademlia) BroadcastMessage(req BroadcastMessageRequest, res *BroadcastM
 	if foundGroup {
 		log.Printf("Recevied broadcast message %s", req.Message)
 		if group.IsRendezvousPoint {
-			current := group.Children.Front()
+			/*current := group.Children.Front()
 			if current != nil {
 				child := current.Value.(*Contact)
 				//k.SendCheckForLostMessages(req.GroupID, child)
-			}
+			}*/
 			lastMessage := group.Messages.Front()
 			messageNumber := 0
 			if(lastMessage!=nil) {
